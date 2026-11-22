@@ -4,6 +4,7 @@ use crate::discord::Headline;
 use crate::hotkeys::{self, Command};
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::overlay_wayland;
+use crate::theme;
 use crate::ytm::{Item, Layout, Section};
 use crate::{APP_NAME, VERSION};
 use eframe::egui::ecolor::Hsva;
@@ -18,16 +19,6 @@ use egui_phosphor::regular as icon;
 use std::ops::Range;
 use std::sync::{Arc, LazyLock};
 use std::time::{Duration, Instant};
-
-const BASE: Color32 = rgb(0x0E0F12);
-const PANEL: Color32 = rgb(0x0A0B0D);
-const RAISED: Color32 = rgb(0x1A1B20);
-const TEXT: Color32 = rgb(0xECEDEF);
-const MUTED: Color32 = Color32::from_rgba_premultiplied(166, 166, 166, 166);
-const FAINT: Color32 = Color32::from_rgba_premultiplied(122, 122, 122, 122);
-const ACCENT: Color32 = rgb(0xF4623F);
-const ON_ACCENT: Color32 = rgb(0x1A0A05);
-const FLOATING: Color32 = rgb(0x1B1C21);
 
 const SIDEBAR_WIDTH: f32 = 244.0;
 const QUEUE_WIDTH: f32 = 336.0;
@@ -318,10 +309,10 @@ pub fn install(ctx: &egui::Context) {
     ctx.style_mut(|style| {
         let visuals = &mut style.visuals;
         *visuals = egui::Visuals::dark();
-        visuals.panel_fill = BASE;
-        visuals.window_fill = FLOATING;
-        visuals.extreme_bg_color = PANEL;
-        visuals.override_text_color = Some(TEXT);
+        visuals.panel_fill = theme::base();
+        visuals.window_fill = theme::floating();
+        visuals.extreme_bg_color = theme::panel();
+        visuals.override_text_color = Some(theme::text());
         visuals.window_stroke = Stroke::new(1.0, veil(0.08));
         visuals.window_corner_radius = 10.into();
         visuals.menu_corner_radius = 13.into();
@@ -331,9 +322,9 @@ pub fn install(ctx: &egui::Context) {
             spread: 0,
             color: shade(0.5),
         };
-        visuals.selection.bg_fill = ACCENT.gamma_multiply(0.45);
-        visuals.selection.stroke = Stroke::new(1.0, TEXT);
-        visuals.text_cursor.stroke = Stroke::new(1.5, ACCENT);
+        visuals.selection.bg_fill = theme::accent().gamma_multiply(0.45);
+        visuals.selection.stroke = Stroke::new(1.0, theme::text());
+        visuals.text_cursor.stroke = Stroke::new(1.5, theme::accent());
         visuals.interact_cursor = Some(egui::CursorIcon::PointingHand);
         for (widget, fill) in [
             (&mut visuals.widgets.inactive, Color32::TRANSPARENT),
@@ -344,7 +335,7 @@ pub fn install(ctx: &egui::Context) {
             widget.bg_fill = fill;
             widget.weak_bg_fill = fill;
             widget.bg_stroke = Stroke::NONE;
-            widget.fg_stroke = Stroke::new(1.0, TEXT);
+            widget.fg_stroke = Stroke::new(1.0, theme::text());
             widget.corner_radius = 6.into();
             widget.expansion = 0.0;
         }
@@ -382,9 +373,9 @@ pub fn app_icon() -> egui::IconData {
             let radius = (x / SIZE as f32 * 2.0 - 1.0).hypot(y / SIZE as f32 * 2.0 - 1.0);
             if radius < 0.96 {
                 let color = if radius < 0.17 || (0.53..0.57).contains(&radius) {
-                    PANEL
+                    theme::panel()
                 } else {
-                    ACCENT
+                    theme::accent()
                 };
                 covered += 1.0;
                 sum = [sum[0] + color.r() as f32, sum[1] + color.g() as f32, sum[2] + color.b() as f32];
@@ -475,7 +466,7 @@ impl TitleBar {
         let attributes = [
             (DWMWA_USE_IMMERSIVE_DARK_MODE, 1),
             (DWMWA_CAPTION_COLOR, packed(color)),
-            (DWMWA_TEXT_COLOR, packed(TEXT)),
+            (DWMWA_TEXT_COLOR, packed(theme::text())),
         ];
         for (attribute, value) in attributes {
             unsafe { DwmSetWindowAttribute(self.window as _, attribute as u32, (&raw const value).cast(), 4) };
@@ -501,10 +492,10 @@ pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
     let scrub = egui::TopBottomPanel::bottom("player")
         .exact_height(BAR_HEIGHT)
         .show_separator_line(false)
-        .frame(plain(PANEL))
+        .frame(plain(theme::panel()))
         .show(ctx, |ui| player_bar(app, ui, &mut out))
         .inner;
-    let mut frame = PANEL;
+    let mut frame = theme::panel();
     let forget_scroll = |heading: bool| ctx.data_mut(|data| data.remove_temp::<String>(Id::new(("queue-scrolled", heading))));
     if app.expanded && app.now_playing().is_some() {
         forget_scroll(true);
@@ -512,7 +503,7 @@ pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
             forget_scroll(false);
         }
         frame = egui::CentralPanel::default()
-            .frame(plain(PANEL))
+            .frame(plain(theme::panel()))
             .show(ctx, |ui| now_playing(app, ui, &mut out))
             .inner;
     } else {
@@ -520,7 +511,7 @@ pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
             .exact_width(SIDEBAR_WIDTH)
             .resizable(false)
             .show_separator_line(false)
-            .frame(plain(PANEL))
+            .frame(plain(theme::panel()))
             .show(ctx, |ui| sidebar(app, ui, &mut out));
         let queue_wanted = app.saved.queue_open;
         let queue_fits = queue_wanted && ctx.content_rect().width() >= QUEUE_MIN_WINDOW;
@@ -535,9 +526,9 @@ pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
             .exact_width(QUEUE_WIDTH)
             .resizable(false)
             .show_separator_line(false)
-            .frame(plain(PANEL))
+            .frame(plain(theme::panel()))
             .show_animated(ctx, queue_fits, |ui| queue_panel(app, ui, &mut out));
-        egui::CentralPanel::default().frame(plain(BASE)).show(ctx, |ui| {
+        egui::CentralPanel::default().frame(plain(theme::base())).show(ctx, |ui| {
             if queue_instead {
                 queue_panel(app, ui, &mut out);
             } else {
@@ -781,7 +772,8 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
     let height = overlay_height(rows, controls);
     let area = ui.max_rect();
     let card = Rect::from_min_size(area.min, vec2(area.width(), height));
-    ui.painter().rect(card, 8.0, PANEL, Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
+    ui.painter()
+        .rect(card, 8.0, theme::panel(), Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
     let drag = ui.interact(card, Id::new("overlay-drag"), Sense::drag());
     let grip = Id::new("overlay-grip");
     let outer = ui.ctx().input(|input| input.viewport().outer_rect);
@@ -805,7 +797,7 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
         .input(|input| input.pointer.hover_pos())
         .is_some_and(|pointer| card.contains(pointer));
     let seen = ui.ctx().animate_bool_with_time(Id::new("overlay-hover"), over_card, HOVER_TIME);
-    let close_tone = MUTED.gamma_multiply(egui::lerp(OVERLAY_CLOSE_DIM..=1.0, seen));
+    let close_tone = theme::muted().gamma_multiply(egui::lerp(OVERLAY_CLOSE_DIM..=1.0, seen));
     if icon_button(
         ui,
         close,
@@ -825,13 +817,13 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
         Some(track) => {
             artwork(ui, art, &track.cover, cover, 8.0);
             let (title, byline) = (pos2(left, cover.center().y - 10.0), pos2(left, cover.center().y + 10.0));
-            label(ui, title, Align2::LEFT_CENTER, &track.title, medium(14.0), TEXT, width);
-            label(ui, byline, Align2::LEFT_CENTER, &track.subtitle, sans(12.5), MUTED, width);
+            label(ui, title, Align2::LEFT_CENTER, &track.title, medium(14.0), theme::text(), width);
+            label(ui, byline, Align2::LEFT_CENTER, &track.subtitle, sans(12.5), theme::muted(), width);
         }
         None => {
-            ui.painter().rect_filled(cover, 8.0, RAISED);
+            ui.painter().rect_filled(cover, 8.0, theme::raised());
             let at = pos2(left, cover.center().y);
-            label(ui, at, Align2::LEFT_CENTER, "Nothing playing", medium(14.0), MUTED, width);
+            label(ui, at, Align2::LEFT_CENTER, "Nothing playing", medium(14.0), theme::muted(), width);
         }
     }
 
@@ -843,11 +835,14 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
     };
     let bar = Rect::from_min_size(pos2(inner.left(), cover.bottom() + 14.0), vec2(inner.width(), 4.0));
     ui.painter().rect_filled(bar, 2.0, veil(0.16));
-    ui.painter()
-        .rect_filled(Rect::from_min_size(bar.min, vec2(bar.width() * played, bar.height())), 2.0, ACCENT);
+    ui.painter().rect_filled(
+        Rect::from_min_size(bar.min, vec2(bar.width() * played, bar.height())),
+        2.0,
+        theme::accent(),
+    );
     let (start, end) = (pos2(bar.left(), bar.bottom() + 10.0), pos2(bar.right(), bar.bottom() + 10.0));
-    label(ui, start, Align2::LEFT_CENTER, &clock(position), sans(11.5), FAINT, 60.0);
-    label(ui, end, Align2::RIGHT_CENTER, &clock(duration), sans(11.5), FAINT, 60.0);
+    label(ui, start, Align2::LEFT_CENTER, &clock(position), sans(11.5), theme::faint(), 60.0);
+    label(ui, end, Align2::RIGHT_CENTER, &clock(duration), sans(11.5), theme::faint(), 60.0);
 
     if controls {
         overlay_controls(view, ui, out, pos2(bar.center().x, bar.bottom() + 40.0));
@@ -857,14 +852,30 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
         return;
     }
     let heading = pos2(inner.left(), card.top() + overlay_base_height(controls) + 14.0);
-    label(ui, heading, Align2::LEFT_CENTER, "Next up", bold(12.0), FAINT, inner.width());
+    label(
+        ui,
+        heading,
+        Align2::LEFT_CENTER,
+        "Next up",
+        bold(12.0),
+        theme::faint(),
+        inner.width(),
+    );
     for (at, entry) in view.next_up.iter().enumerate() {
         let top = heading.y + 14.0 + at as f32 * OVERLAY_ROW;
         let slot = Rect::from_min_size(pos2(inner.left(), top), vec2(inner.width(), OVERLAY_ROW));
         let response = ui.interact(slot, Id::new(("overlay-row", entry.index)), Sense::click());
         let hover = hover_of(ui, &response);
-        let (below, width) = queue_row(ui, art, &entry.cover, &entry.title, slot.shrink2(vec2(0.0, 4.0)), hover, TEXT);
-        label(ui, below, Align2::LEFT_CENTER, &entry.subtitle, sans(12.5), MUTED, width);
+        let (below, width) = queue_row(
+            ui,
+            art,
+            &entry.cover,
+            &entry.title,
+            slot.shrink2(vec2(0.0, 4.0)),
+            hover,
+            theme::text(),
+        );
+        label(ui, below, Align2::LEFT_CENTER, &entry.subtitle, sans(12.5), theme::muted(), width);
         describe(&response, &entry.title);
         if response.clicked() {
             out.push(Action::Jump(entry.index));
@@ -874,7 +885,7 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
 
 fn overlay_controls(view: &OverlayView, ui: &Ui, out: &mut Vec<Action>, middle: Pos2) {
     let around = |offset: f32, size: f32| Rect::from_center_size(middle + vec2(offset, 0.0), Vec2::splat(size));
-    let tone = if view.track.is_some() { TEXT } else { FAINT };
+    let tone = if view.track.is_some() { theme::text() } else { theme::faint() };
     if icon_button(
         ui,
         around(-52.0, 36.0),
@@ -951,10 +962,12 @@ fn text_link(ui: &Ui, id: Id, rect: Rect, origin: Pos2, galley: &Arc<Galley>, hi
     let response = ui.interact(rect, id, Sense::click());
     let hover = hover_of(ui, &response);
     if hover > 0.0 {
-        ui.painter()
-            .with_clip_rect(rect)
-            .galley_with_override_text_color(origin, galley.clone(), MUTED.lerp_to_gamma(TEXT, hover));
-        let line = Stroke::new(1.0, TEXT.gamma_multiply(hover));
+        ui.painter().with_clip_rect(rect).galley_with_override_text_color(
+            origin,
+            galley.clone(),
+            theme::muted().lerp_to_gamma(theme::text(), hover),
+        );
+        let line = Stroke::new(1.0, theme::text().gamma_multiply(hover));
         ui.painter().hline(rect.x_range(), rect.bottom() - 1.0, line);
     }
     describe(&response, hint);
@@ -989,9 +1002,9 @@ fn artist_links(ui: &Ui, out: &mut Vec<Action>, item: &Item, id: Id, origin: Pos
 }
 
 fn byline(ui: &Ui, out: &mut Vec<Action>, item: &Item, id: Id, at: Pos2, font: FontId, width: f32) -> Rect {
-    let galley = fit(ui, &item.subtitle, font, MUTED, width, 1);
+    let galley = fit(ui, &item.subtitle, font, theme::muted(), width, 1);
     let rect = Align2::LEFT_CENTER.anchor_size(at, galley.size());
-    ui.painter().galley(rect.min, galley.clone(), MUTED);
+    ui.painter().galley(rect.min, galley.clone(), theme::muted());
     artist_links(ui, out, item, id, rect.min, &galley, &item.subtitle);
     rect
 }
@@ -1006,15 +1019,18 @@ fn eyebrow(ui: &mut Ui, text: &str, inset: f32) {
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::hover());
     let format = TextFormat {
         font_id: bold(11.0),
-        color: FAINT,
+        color: theme::faint(),
         extra_letter_spacing: 1.3,
         ..TextFormat::default()
     };
     let mut job = LayoutJob::default();
     job.append(&text.to_uppercase(), 0.0, format);
     let galley = ui.painter().layout_job(job);
-    ui.painter()
-        .galley(pos2(rect.left() + inset, rect.center().y - galley.size().y / 2.0), galley, FAINT);
+    ui.painter().galley(
+        pos2(rect.left() + inset, rect.center().y - galley.size().y / 2.0),
+        galley,
+        theme::faint(),
+    );
 }
 
 fn hover_of(ui: &Ui, response: &Response) -> f32 {
@@ -1039,8 +1055,8 @@ fn icon_button(ui: &Ui, rect: Rect, id: Id, symbol: &str, font: FontId, color: C
     let pressed = if response.is_pointer_button_down_on() { 1.0 } else { 0.0 };
     ui.painter()
         .circle_filled(rect.center(), rect.width() / 2.0 - pressed, veil(0.09 * hover));
-    let tone = if color == MUTED || color == FAINT {
-        color.lerp_to_gamma(TEXT, hover)
+    let tone = if color == theme::muted() || color == theme::faint() {
+        color.lerp_to_gamma(theme::text(), hover)
     } else {
         color
     };
@@ -1050,21 +1066,31 @@ fn icon_button(ui: &Ui, rect: Rect, id: Id, symbol: &str, font: FontId, color: C
 }
 
 fn text_button(ui: &Ui, right_center: Pos2, id: Id, text: &str) -> Response {
-    let galley = fit(ui, text, medium(13.0), MUTED, 120.0, 1);
+    let galley = fit(ui, text, medium(13.0), theme::muted(), 120.0, 1);
     let slot = Align2::RIGHT_CENTER
         .anchor_size(right_center, galley.size())
         .expand2(vec2(10.0, 6.0));
     let response = ui.interact(slot, id, Sense::click());
     let hover = hover_of(ui, &response);
     ui.painter().rect_filled(slot, 14.0, veil(0.07 * hover));
-    ui.painter()
-        .galley_with_override_text_color(slot.shrink2(vec2(10.0, 6.0)).min, galley, MUTED.lerp_to_gamma(TEXT, hover));
+    ui.painter().galley_with_override_text_color(
+        slot.shrink2(vec2(10.0, 6.0)).min,
+        galley,
+        theme::muted().lerp_to_gamma(theme::text(), hover),
+    );
     describe(&response, text);
     response
 }
 
 fn pill(ui: &Ui, at: Pos2, id: Id, symbol: &str, text: &str, primary: bool) -> Response {
-    let galley = fit(ui, text, bold(14.0), if primary { ON_ACCENT } else { TEXT }, 240.0, 1);
+    let galley = fit(
+        ui,
+        text,
+        bold(14.0),
+        if primary { theme::on_accent() } else { theme::text() },
+        240.0,
+        1,
+    );
     let rect = Rect::from_min_size(at, vec2(galley.size().x + 62.0, 42.0));
     let response = ui.interact(rect, id, Sense::click());
     let hover = hover_of(ui, &response);
@@ -1074,11 +1100,11 @@ fn pill(ui: &Ui, at: Pos2, id: Id, symbol: &str, text: &str, primary: bool) -> R
         rect
     };
     let fill = if primary {
-        ACCENT.lerp_to_gamma(Color32::WHITE, 0.12 * hover)
+        theme::accent().lerp_to_gamma(Color32::WHITE, 0.12 * hover)
     } else {
         veil(0.09 + 0.05 * hover)
     };
-    let ink = if primary { ON_ACCENT } else { TEXT };
+    let ink = if primary { theme::on_accent() } else { theme::text() };
     ui.painter().rect_filled(body, 21.0, fill);
     ui.painter().text(
         pos2(rect.left() + 28.0, rect.center().y),
@@ -1098,7 +1124,7 @@ fn artwork(ui: &Ui, art: &Art, url: &str, rect: Rect, radius: f32) {
         Some(picture) => egui::Image::from_texture((picture.id, rect.size()))
             .corner_radius(radius)
             .paint_at(ui, rect),
-        None => drop(ui.painter().rect_filled(rect, radius, RAISED)),
+        None => drop(ui.painter().rect_filled(rect, radius, theme::raised())),
     }
 }
 
@@ -1108,8 +1134,11 @@ fn bars(ui: &Ui, center: Pos2, moving: bool) {
         let wave = (time * (5.2 + bar as f64 * 1.9) + bar as f64 * 2.1).sin() as f32;
         let x = center.x + (bar as f32 - 1.0) * 5.0;
         let top = center.y + 7.0 - (4.0 + 5.0 * (1.0 + wave));
-        ui.painter()
-            .rect_filled(Rect::from_min_max(pos2(x - 1.5, top), pos2(x + 1.5, center.y + 7.0)), 1.0, ACCENT);
+        ui.painter().rect_filled(
+            Rect::from_min_max(pos2(x - 1.5, top), pos2(x + 1.5, center.y + 7.0)),
+            1.0,
+            theme::accent(),
+        );
     }
     if moving && ui.input(|input| input.focused) {
         ui.ctx().request_repaint_after(Duration::from_millis(66));
@@ -1128,7 +1157,11 @@ fn wide_row(ui: &mut Ui, size: Vec2, symbol: &str, font: FontId, tint: Color32, 
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let hover = hover_of(ui, &response);
     ui.painter().rect_filled(rect, 7.0, veil(0.08 * hover));
-    let tone = if tint == ACCENT { tint } else { tint.lerp_to_gamma(TEXT, hover) };
+    let tone = if tint == theme::accent() {
+        tint
+    } else {
+        tint.lerp_to_gamma(theme::text(), hover)
+    };
     ui.painter()
         .text(pos2(rect.left() + 22.0, rect.center().y), Align2::CENTER_CENTER, symbol, font, tone);
     label(
@@ -1137,7 +1170,7 @@ fn wide_row(ui: &mut Ui, size: Vec2, symbol: &str, font: FontId, tint: Color32, 
         Align2::LEFT_CENTER,
         text,
         medium(13.5),
-        TEXT,
+        theme::text(),
         rect.width() - 58.0,
     );
     describe(&response, text);
@@ -1145,12 +1178,13 @@ fn wide_row(ui: &mut Ui, size: Vec2, symbol: &str, font: FontId, tint: Color32, 
 }
 
 fn switch_row(ui: &mut Ui, size: Vec2, symbol: &str, text: &str, on: bool) -> bool {
-    let response = wide_row(ui, size, symbol, glyph(17.0), MUTED, text);
+    let response = wide_row(ui, size, symbol, glyph(17.0), theme::muted(), text);
     let lit = ui.ctx().animate_bool_with_time(response.id.with("switch"), on, HOVER_TIME);
     let track = Rect::from_center_size(pos2(response.rect.right() - 27.0, response.rect.center().y), vec2(30.0, 18.0));
-    ui.painter().rect_filled(track, 9.0, veil(0.16).lerp_to_gamma(ACCENT, lit));
+    ui.painter().rect_filled(track, 9.0, veil(0.16).lerp_to_gamma(theme::accent(), lit));
     let knob = pos2(egui::lerp(track.left() + 9.0..=track.right() - 9.0, lit), track.center().y);
-    ui.painter().circle_filled(knob, 6.0, TEXT.lerp_to_gamma(ON_ACCENT, lit));
+    ui.painter()
+        .circle_filled(knob, 6.0, theme::text().lerp_to_gamma(theme::on_accent(), lit));
     response.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, true, on, text));
     response.clicked()
 }
@@ -1176,7 +1210,7 @@ fn song_actions(ui: &mut Ui, cx: &mut Cx, item: &Item) {
         Align2::LEFT_CENTER,
         &item.title,
         medium(13.5),
-        TEXT,
+        theme::text(),
         width,
     );
     label(
@@ -1185,36 +1219,36 @@ fn song_actions(ui: &mut Ui, cx: &mut Cx, item: &Item) {
         Align2::LEFT_CENTER,
         &item.subtitle,
         sans(12.5),
-        MUTED,
+        theme::muted(),
         width,
     );
     menu_divider(ui);
 
     let mut choice = None;
-    if menu_row(ui, icon::ARROW_BEND_DOWN_RIGHT, glyph(17.0), MUTED, "Play next").clicked() {
+    if menu_row(ui, icon::ARROW_BEND_DOWN_RIGHT, glyph(17.0), theme::muted(), "Play next").clicked() {
         choice = Some(Action::PlayNext(item.clone()));
     }
-    if menu_row(ui, icon::LIST_PLUS, glyph(17.0), MUTED, "Add to queue").clicked() {
+    if menu_row(ui, icon::LIST_PLUS, glyph(17.0), theme::muted(), "Add to queue").clicked() {
         choice = Some(Action::Enqueue(item.clone()));
     }
     let (font, tint, text) = if cx.is_liked(item) {
-        (solid(17.0), ACCENT, "Remove from Liked songs")
+        (solid(17.0), theme::accent(), "Remove from Liked songs")
     } else {
-        (glyph(17.0), MUTED, "Add to Liked songs")
+        (glyph(17.0), theme::muted(), "Add to Liked songs")
     };
     if menu_row(ui, icon::HEART, font, tint, text).clicked() {
         choice = Some(Action::Like(item.clone()));
     }
-    if menu_row(ui, icon::SHARE_NETWORK, glyph(17.0), MUTED, "Share").clicked() {
+    if menu_row(ui, icon::SHARE_NETWORK, glyph(17.0), theme::muted(), "Share").clicked() {
         choice = Some(Action::Share(item.clone()));
     }
     if !item.artist_id.is_empty() || !item.album_id.is_empty() {
         menu_divider(ui);
     }
-    if !item.artist_id.is_empty() && menu_row(ui, icon::MICROPHONE_STAGE, glyph(17.0), MUTED, "Go to artist").clicked() {
+    if !item.artist_id.is_empty() && menu_row(ui, icon::MICROPHONE_STAGE, glyph(17.0), theme::muted(), "Go to artist").clicked() {
         choice = Some(Action::Go(Route::Browse(item.artist_id.clone())));
     }
-    if !item.album_id.is_empty() && menu_row(ui, icon::VINYL_RECORD, glyph(17.0), MUTED, "Go to album").clicked() {
+    if !item.album_id.is_empty() && menu_row(ui, icon::VINYL_RECORD, glyph(17.0), theme::muted(), "Go to album").clicked() {
         choice = Some(Action::Go(Route::Browse(item.album_id.clone())));
     }
     if let Some(action) = choice {
@@ -1247,7 +1281,7 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
     ui.painter().rect_filled(rect, ROW_RADIUS, veil(0.06 * hover));
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0, MUTED), StrokeKind::Inside);
+            .rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0, theme::muted()), StrokeKind::Inside);
     }
 
     let mut left = rect.left() + 12.0;
@@ -1258,7 +1292,7 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
                 bars(ui, slot, !cx.paused);
             } else {
                 ui.painter()
-                    .text(slot, Align2::CENTER_CENTER, number.to_string(), sans(13.5), FAINT);
+                    .text(slot, Align2::CENTER_CENTER, number.to_string(), sans(13.5), theme::faint());
             }
             left += 40.0;
         }
@@ -1283,21 +1317,29 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
                 Align2::CENTER_CENTER,
                 icon::DOTS_THREE,
                 glyph(19.0),
-                MUTED.gamma_multiply(hover).lerp_to_gamma(TEXT, lift),
+                theme::muted().gamma_multiply(hover).lerp_to_gamma(theme::text(), lift),
             );
         }
         describe(more, "More");
         egui::Popup::menu(more).gap(4.0).show(|ui| song_actions(ui, cx, item));
         right -= 36.0;
-        label(ui, pos2(right, mid), Align2::RIGHT_CENTER, &item.duration, sans(13.0), MUTED, 60.0);
+        label(
+            ui,
+            pos2(right, mid),
+            Align2::RIGHT_CENTER,
+            &item.duration,
+            sans(13.0),
+            theme::muted(),
+            60.0,
+        );
         right -= 52.0;
         let liked = cx.is_liked(item);
         if liked || hover > 0.0 {
             let slot = Rect::from_center_size(pos2(right - 14.0, mid), Vec2::splat(30.0));
             let (font, color) = if liked {
-                (solid(16.0), ACCENT)
+                (solid(16.0), theme::accent())
             } else {
-                (glyph(16.0), MUTED.gamma_multiply(hover))
+                (glyph(16.0), theme::muted().gamma_multiply(hover))
             };
             let hint = if liked { "Remove from Liked songs" } else { "Add to Liked songs" };
             if icon_button(ui, slot, response.id.with("like"), icon::HEART, font, color, hint).clicked() {
@@ -1306,15 +1348,20 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
         }
         right -= 40.0;
     } else {
-        ui.painter()
-            .text(pos2(right - 6.0, mid), Align2::CENTER_CENTER, icon::CARET_RIGHT, glyph(14.0), FAINT);
+        ui.painter().text(
+            pos2(right - 6.0, mid),
+            Align2::CENTER_CENTER,
+            icon::CARET_RIGHT,
+            glyph(14.0),
+            theme::faint(),
+        );
         right -= 28.0;
     }
     if rect.width() > 700.0 && !item.extra.is_empty() {
         let column = rect.width() * 0.26;
-        let galley = fit(ui, &item.extra, sans(13.0), MUTED, column - 12.0, 1);
+        let galley = fit(ui, &item.extra, sans(13.0), theme::muted(), column - 12.0, 1);
         let album = Align2::LEFT_CENTER.anchor_size(pos2(right - column, mid), galley.size());
-        ui.painter().galley(album.min, galley.clone(), MUTED);
+        ui.painter().galley(album.min, galley.clone(), theme::muted());
         let shown = galley.rows.iter().map(|row| row.char_count_excluding_newline()).sum();
         let span = album_span(&item.extra, shown).filter(|_| !item.album_id.is_empty() && !item.is_artist);
         if let Some(span) = span {
@@ -1326,7 +1373,7 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
         right -= column + 20.0;
     }
 
-    let title = if playing { ACCENT } else { TEXT };
+    let title = if playing { theme::accent() } else { theme::text() };
     label(
         ui,
         pos2(left, mid - 10.0),
@@ -1363,16 +1410,22 @@ fn card(ui: &Ui, cx: &mut Cx, items: &[Item], index: usize, cell: Rect, id: Id) 
         ui.painter().rect_filled(art, radius, shade(0.28 * lit));
         if item.is_song() {
             let badge = pos2(art.right() - 32.0, art.bottom() - 26.0 - 6.0 * lit);
-            ui.painter().circle_filled(badge, 22.0, ACCENT.gamma_multiply(lit));
+            ui.painter().circle_filled(badge, 22.0, theme::accent().gamma_multiply(lit));
             let symbol = if playing && !cx.paused { icon::PAUSE } else { icon::PLAY };
-            ui.painter()
-                .text(badge, Align2::CENTER_CENTER, symbol, solid(19.0), ON_ACCENT.gamma_multiply(lit));
+            ui.painter().text(
+                badge,
+                Align2::CENTER_CENTER,
+                symbol,
+                solid(19.0),
+                theme::on_accent().gamma_multiply(lit),
+            );
         }
     }
     if response.has_focus() {
-        ui.painter().rect_stroke(art, radius, Stroke::new(1.5, TEXT), StrokeKind::Inside);
+        ui.painter()
+            .rect_stroke(art, radius, Stroke::new(1.5, theme::text()), StrokeKind::Inside);
     }
-    let title = if playing { ACCENT } else { TEXT };
+    let title = if playing { theme::accent() } else { theme::text() };
     label(
         ui,
         pos2(cell.left(), art.bottom() + 22.0),
@@ -1408,7 +1461,7 @@ fn compact(ui: &Ui, cx: &mut Cx, items: &[Item], index: usize, cell: Rect, id: I
         bars(ui, art.center(), !cx.paused);
     }
     let (left, width) = (art.right() + 14.0, cell.right() - art.right() - 26.0);
-    let title = if playing { ACCENT } else { TEXT };
+    let title = if playing { theme::accent() } else { theme::text() };
     label(
         ui,
         pos2(left, cell.center().y - 10.0),
@@ -1463,10 +1516,18 @@ fn section_view(ui: &mut Ui, cx: &mut Cx, section: &Section, id: Id, numbered: b
     let mut open = ui.data(|data| data.get_temp::<bool>(id)).unwrap_or(false);
     if !title.is_empty() || foldable {
         let (row, _) = ui.allocate_exact_size(vec2(width, 32.0), Sense::hover());
-        label(ui, row.left_center(), Align2::LEFT_CENTER, title, bold(20.0), TEXT, width - 120.0);
+        label(
+            ui,
+            row.left_center(),
+            Align2::LEFT_CENTER,
+            title,
+            bold(20.0),
+            theme::text(),
+            width - 120.0,
+        );
         if loading {
             egui::Spinner::new()
-                .color(ACCENT)
+                .color(theme::accent())
                 .paint_at(ui, Rect::from_center_size(row.right_center() - vec2(16.0, 0.0), Vec2::splat(16.0)));
         } else if foldable {
             let text = if open { "Show less" } else { "Show all" };
@@ -1521,7 +1582,7 @@ fn top_result(ui: &mut Ui, cx: &mut Cx, items: &[Item], id: Id) {
         Align2::LEFT_CENTER,
         &item.title,
         display(38.0),
-        TEXT,
+        theme::text(),
         width,
     );
     let below = pos2(left, rect.center().y + 20.0);
@@ -1553,7 +1614,8 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
     match symbol {
         Some(symbol) => {
             ui.painter().rect_filled(art, 12.0, veil(0.06));
-            ui.painter().text(art.center(), Align2::CENTER_CENTER, symbol, solid(84.0), ACCENT);
+            ui.painter()
+                .text(art.center(), Align2::CENTER_CENTER, symbol, solid(84.0), theme::accent());
         }
         None => artwork(ui, cx.art, &item.thumb, art, if item.is_artist { HERO_ART / 2.0 } else { 12.0 }),
     }
@@ -1571,9 +1633,9 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
     if let Some(pinned) = pinned {
         let slot = Rect::from_min_size(at, Vec2::splat(42.0));
         let (font, color, hint) = if pinned {
-            (solid(19.0), ACCENT, "Remove from library")
+            (solid(19.0), theme::accent(), "Remove from library")
         } else {
-            (glyph(19.0), MUTED, "Save to library")
+            (glyph(19.0), theme::muted(), "Save to library")
         };
         if icon_button(ui, slot, ui.id().with("hero-pin"), icon::BOOKMARK_SIMPLE, font, color, hint).clicked() {
             cx.out.push(Action::Pin(item.clone()));
@@ -1588,7 +1650,7 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
             ui.id().with("hero-share"),
             icon::SHARE_NETWORK,
             glyph(19.0),
-            MUTED,
+            theme::muted(),
             "Copy link",
         )
         .clicked()
@@ -1597,7 +1659,10 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
     }
     bottom -= 60.0;
 
-    for (text, font, color, linked) in [(&item.subtitle, sans(14.0), MUTED, false), (&item.extra, medium(15.0), TEXT, true)] {
+    for (text, font, color, linked) in [
+        (&item.subtitle, sans(14.0), theme::muted(), false),
+        (&item.extra, medium(15.0), theme::text(), true),
+    ] {
         if !text.is_empty() {
             let galley = fit(ui, text, font, color, width, 1);
             let line = Align2::LEFT_BOTTOM.anchor_size(pos2(left, bottom), galley.size());
@@ -1613,8 +1678,8 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
         17..=34 => 50.0,
         _ => 38.0,
     };
-    let title = fit(ui, &item.title, display(size), TEXT, width, 2);
-    ui.painter().galley(pos2(left, bottom - title.size().y), title, TEXT);
+    let title = fit(ui, &item.title, display(size), theme::text(), width, 2);
+    ui.painter().galley(pos2(left, bottom - title.size().y), title, theme::text());
     play_clicked
 }
 
@@ -1658,14 +1723,14 @@ fn message(ui: &mut Ui, symbol: &str, title: &str, hint: &str) -> Rect {
     let center = rect.center_top();
     ui.painter().circle_filled(center + vec2(0.0, 34.0), 34.0, veil(0.06));
     ui.painter()
-        .text(center + vec2(0.0, 34.0), Align2::CENTER_CENTER, symbol, glyph(30.0), MUTED);
+        .text(center + vec2(0.0, 34.0), Align2::CENTER_CENTER, symbol, glyph(30.0), theme::muted());
     label(
         ui,
         center + vec2(0.0, 92.0),
         Align2::CENTER_CENTER,
         title,
         bold(18.0),
-        TEXT,
+        theme::text(),
         rect.width(),
     );
     label(
@@ -1674,7 +1739,7 @@ fn message(ui: &mut Ui, symbol: &str, title: &str, hint: &str) -> Rect {
         Align2::CENTER_CENTER,
         hint,
         sans(14.0),
-        MUTED,
+        theme::muted(),
         rect.width(),
     );
     rect
@@ -1841,16 +1906,16 @@ fn sticky(ui: &Ui, strip: Rect, title: &str, playable: bool) -> bool {
         ui.painter().circle_filled(
             slot.center(),
             19.0 + hover - pressed,
-            ACCENT.lerp_to_gamma(Color32::WHITE, 0.12 * hover),
+            theme::accent().lerp_to_gamma(Color32::WHITE, 0.12 * hover),
         );
         ui.painter()
-            .text(slot.center(), Align2::CENTER_CENTER, icon::PLAY, solid(17.0), ON_ACCENT);
+            .text(slot.center(), Align2::CENTER_CENTER, icon::PLAY, solid(17.0), theme::on_accent());
         describe(&play, "Play");
         clicked = play.clicked();
         left = slot.right() + 16.0;
     }
     let width = strip.right() - left - PAGE_MARGIN as f32;
-    label(ui, pos2(left, mid), Align2::LEFT_CENTER, title, bold(18.0), TEXT, width);
+    label(ui, pos2(left, mid), Align2::LEFT_CENTER, title, bold(18.0), theme::text(), width);
     ui.painter()
         .hline(strip.x_range(), strip.bottom() - 0.5, Stroke::new(1.0, veil(0.07)));
     clicked
@@ -1867,9 +1932,14 @@ fn topbar(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
     for (symbol, enabled, action, hint) in steps {
         let slot = Rect::from_center_size(pos2(left + 18.0, mid), Vec2::splat(36.0));
         if !enabled {
-            ui.painter()
-                .text(slot.center(), Align2::CENTER_CENTER, symbol, glyph(17.0), FAINT.gamma_multiply(0.5));
-        } else if icon_button(ui, slot, Id::new(hint), symbol, glyph(17.0), MUTED, hint).clicked() {
+            ui.painter().text(
+                slot.center(),
+                Align2::CENTER_CENTER,
+                symbol,
+                glyph(17.0),
+                theme::faint().gamma_multiply(0.5),
+            );
+        } else if icon_button(ui, slot, Id::new(hint), symbol, glyph(17.0), theme::muted(), hint).clicked() {
             out.push(action);
         }
         left += 40.0;
@@ -1886,7 +1956,7 @@ fn topbar(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
         Align2::CENTER_CENTER,
         icon::MAGNIFYING_GLASS,
         glyph(17.0),
-        MUTED,
+        theme::muted(),
     );
     let input = Rect::from_min_max(pos2(field.left() + 44.0, field.top()), pos2(field.right() - 64.0, field.bottom()));
     let layout = egui::Layout::left_to_right(Align::Center);
@@ -1898,8 +1968,8 @@ fn topbar(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
                 .margin(Margin::ZERO)
                 .desired_width(input.width())
                 .font(sans(14.5))
-                .text_color(TEXT)
-                .hint_text(RichText::new("Search songs, albums, artists").color(FAINT));
+                .text_color(theme::text())
+                .hint_text(RichText::new("Search songs, albums, artists").color(theme::faint()));
             ui.add(edit)
         })
         .inner;
@@ -1922,15 +1992,20 @@ fn topbar(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
     );
     let trailing = pos2(field.right() - 24.0, mid);
     if app.query.is_empty() {
-        ui.painter()
-            .text(pos2(field.right() - 16.0, mid), Align2::RIGHT_CENTER, "Ctrl K", sans(12.0), FAINT);
+        ui.painter().text(
+            pos2(field.right() - 16.0, mid),
+            Align2::RIGHT_CENTER,
+            "Ctrl K",
+            sans(12.0),
+            theme::faint(),
+        );
     } else if icon_button(
         ui,
         Rect::from_center_size(trailing, Vec2::splat(30.0)),
         Id::new("search-clear"),
         icon::X,
         glyph(14.0),
-        MUTED,
+        theme::muted(),
         "Clear",
     )
     .clicked()
@@ -1952,9 +2027,9 @@ fn content(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
     let playing = app.now_playing().map(|item| (app.saved.covers.of(item), BAR_ART));
     let picture = |source: Option<(&str, f32)>| source.and_then(|(thumb, size)| app.art.get(ui.ctx(), thumb, size));
     let tint = picture(header).or_else(|| picture(playing)).map(|picture| picture.tint);
-    let glow = mood(ui, "ambient", tint, BASE, 0.36);
+    let glow = mood(ui, "ambient", tint, theme::base(), 0.36);
     let haze = Rect::from_min_size(area.min, vec2(area.width(), AMBIENT_HEIGHT.min(area.height())));
-    wash(ui.painter(), haze, glow, BASE);
+    wash(ui.painter(), haze, glow, theme::base());
     topbar(app, ui, out);
 
     let loading = matches!(app.pages.get(&route), Some(Load::Loading));
@@ -2032,8 +2107,8 @@ fn content(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
     let mut pane = ui.new_child(UiBuilder::new().id_salt("sticky").max_rect(strip));
     pane.set_clip_rect(strip);
     pane.set_opacity(stuck);
-    pane.painter().rect_filled(strip, 0.0, BASE);
-    wash(pane.painter(), haze, glow, BASE);
+    pane.painter().rect_filled(strip, 0.0, theme::base());
+    wash(pane.painter(), haze, glow, theme::base());
     if sticky(&pane, strip, title, playable) {
         let songs = match (&route, app.pages.get(&route)) {
             (Route::Liked, _) => app.saved.liked.clone(),
@@ -2065,8 +2140,8 @@ fn keycaps(ui: &Ui, right_center: Pos2, parts: &[String], tint: Color32) -> f32 
         let galley = ui.painter().layout_no_wrap(part.clone(), bold(12.0), tint);
         let size = vec2((galley.size().x + 18.0).max(30.0), 28.0);
         let cap = Rect::from_min_size(pos2(right - size.x, right_center.y - size.y / 2.0), size);
-        let (fill, edge) = if tint == ACCENT {
-            (ACCENT.gamma_multiply(0.14), ACCENT.gamma_multiply(0.6))
+        let (fill, edge) = if tint == theme::accent() {
+            (theme::accent().gamma_multiply(0.14), theme::accent().gamma_multiply(0.6))
         } else {
             (veil(0.09), veil(0.13))
         };
@@ -2097,18 +2172,27 @@ fn hotkey_row(ui: &mut Ui, app: &App, command: Command, enabled: bool, out: &mut
         Command::VolumeDown => icon::SPEAKER_LOW,
         Command::Overlay => icon::PICTURE_IN_PICTURE,
     };
-    let tone = MUTED.lerp_to_gamma(TEXT, hover);
+    let tone = theme::muted().lerp_to_gamma(theme::text(), hover);
     ui.painter()
         .text(pos2(rect.left() + 22.0, middle), Align2::CENTER_CENTER, symbol, glyph(17.0), tone);
     let edge = pos2(rect.right() - 14.0, middle);
     let caps_left = match (recording, app.saved.hotkey_combos[command as usize]) {
         _ if portal => match hotkeys::portal_trigger(command) {
-            Some(trigger) => keycaps(ui, edge, &trigger.split('+').map(str::to_owned).collect::<Vec<_>>(), TEXT),
-            None => label(ui, edge, Align2::RIGHT_CENTER, "Set in system settings", sans(13.0), FAINT, 160.0).left(),
+            Some(trigger) => keycaps(ui, edge, &trigger.split('+').map(str::to_owned).collect::<Vec<_>>(), theme::text()),
+            None => label(
+                ui,
+                edge,
+                Align2::RIGHT_CENTER,
+                "Set in system settings",
+                sans(13.0),
+                theme::faint(),
+                160.0,
+            )
+            .left(),
         },
-        (true, _) => keycaps(ui, edge, &["Press keys\u{2026}".to_owned()], ACCENT),
-        (false, Some(combo)) => keycaps(ui, edge, &combo.parts(), TEXT),
-        (false, None) => label(ui, edge, Align2::RIGHT_CENTER, "Not set", sans(13.0), FAINT, 120.0).left(),
+        (true, _) => keycaps(ui, edge, &["Press keys\u{2026}".to_owned()], theme::accent()),
+        (false, Some(combo)) => keycaps(ui, edge, &combo.parts(), theme::text()),
+        (false, None) => label(ui, edge, Align2::RIGHT_CENTER, "Not set", sans(13.0), theme::faint(), 120.0).left(),
     };
     let note = match (recording, taken) {
         (true, _) => "Hold Ctrl, Alt or Shift with a key. Esc cancels, Backspace clears.",
@@ -2120,9 +2204,9 @@ fn hotkey_row(ui: &mut Ui, app: &App, command: Command, enabled: bool, out: &mut
         .animate_bool_with_time(response.id.with("note"), !note.is_empty(), HOVER_TIME);
     let (left, width) = (rect.left() + 46.0, caps_left - rect.left() - 58.0);
     let name = pos2(left, middle - 9.0 * shown);
-    label(ui, name, Align2::LEFT_CENTER, command.name(), medium(13.5), TEXT, width);
+    label(ui, name, Align2::LEFT_CENTER, command.name(), medium(13.5), theme::text(), width);
     if shown > 0.0 {
-        let color = if taken && !recording { ACCENT } else { MUTED };
+        let color = if taken && !recording { theme::accent() } else { theme::muted() };
         let at = pos2(left, middle + 11.0);
         label(ui, at, Align2::LEFT_CENTER, note, sans(12.0), color.gamma_multiply(shown), width);
     }
@@ -2155,7 +2239,7 @@ fn discord_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
         };
         let (line, response) = ui.allocate_exact_size(vec2(size.x, STATUS_ROW), Sense::hover());
         let at = pos2(line.left() + 46.0, line.center().y);
-        label(ui, at, Align2::LEFT_CENTER, status, sans(12.0), MUTED, size.x - 58.0);
+        label(ui, at, Align2::LEFT_CENTER, status, sans(12.0), theme::muted(), size.x - 58.0);
         response.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, status));
         for (headline, text) in [
             (Headline::App, "Listening to Tubefast"),
@@ -2164,7 +2248,7 @@ fn discord_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
         ] {
             let chosen = app.saved.discord_headline == headline;
             let symbol = if chosen { icon::CHECK } else { "" };
-            let row = wide_row(ui, size, symbol, glyph(15.0), ACCENT, text);
+            let row = wide_row(ui, size, symbol, glyph(15.0), theme::accent(), text);
             row.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, chosen, text));
             if row.clicked() {
                 out.push(Action::DiscordHeadline(headline));
@@ -2173,7 +2257,8 @@ fn discord_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
         let (row, _) = ui.allocate_exact_size(size, Sense::hover());
         if app.saved.discord_headline == Headline::Custom {
             let at = pos2(row.left() + 22.0, row.center().y);
-            ui.painter().text(at, Align2::CENTER_CENTER, icon::CHECK, glyph(15.0), ACCENT);
+            ui.painter()
+                .text(at, Align2::CENTER_CENTER, icon::CHECK, glyph(15.0), theme::accent());
         }
         let field = Rect::from_min_max(
             pos2(row.left() + 38.0, row.top() + 5.0),
@@ -2186,9 +2271,9 @@ fn discord_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
             .frame(false)
             .margin(Margin::ZERO)
             .font(medium(13.5))
-            .text_color(TEXT)
+            .text_color(theme::text())
             .vertical_align(Align::Center)
-            .hint_text(RichText::new("Your own text").color(FAINT));
+            .hint_text(RichText::new("Your own text").color(theme::faint()));
         let typed = ui.put(field.shrink2(vec2(10.0, 0.0)), edit);
         typed.widget_info(|| WidgetInfo::labeled(WidgetType::TextEdit, true, "Your own text"));
         if typed.changed() || typed.gained_focus() {
@@ -2199,14 +2284,14 @@ fn discord_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
 
 fn notice_section(ui: &mut Ui, title: &str, symbol: &str, reason: &str) {
     let text_width = ui.available_width().min(SETTINGS_WIDTH) - 2.0 * CARD_PAD - 58.0;
-    let galley = fit(ui, reason, medium(13.5), MUTED, text_width, 8);
+    let galley = fit(ui, reason, medium(13.5), theme::muted(), text_width, 8);
     let row_height = SETTING_ROW.max(galley.size().y + 24.0);
     section(ui, title, 2.0 * CARD_PAD + row_height, |ui| {
         let (row, _) = ui.allocate_exact_size(vec2(ui.available_width(), row_height), Sense::hover());
         let at = pos2(row.left() + 22.0, row.center().y);
-        ui.painter().text(at, Align2::CENTER_CENTER, symbol, glyph(17.0), MUTED);
+        ui.painter().text(at, Align2::CENTER_CENTER, symbol, glyph(17.0), theme::muted());
         let at = pos2(row.left() + 46.0, row.center().y - galley.size().y / 2.0);
-        ui.painter().galley(at, galley, MUTED);
+        ui.painter().galley(at, galley, theme::muted());
     });
 }
 
@@ -2240,7 +2325,7 @@ fn hotkey_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
         "Hotkeys keep working while Tubefast is minimized. Each one needs Ctrl, Alt or Shift."
     };
     let at = pos2(card.left() + 4.0, card.bottom() + SECTION_GAP / 2.0);
-    label(ui, at, Align2::LEFT_CENTER, text, sans(12.0), FAINT, card.width());
+    label(ui, at, Align2::LEFT_CENTER, text, sans(12.0), theme::faint(), card.width());
 }
 
 fn window_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
@@ -2255,8 +2340,13 @@ fn window_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
 fn slider_row(ui: &mut Ui, size: Vec2, symbol: &str, text: &str, value: f32, enabled: bool) -> Option<f32> {
     let (rect, _) = ui.allocate_exact_size(size, Sense::hover());
     let middle = rect.center().y;
-    ui.painter()
-        .text(pos2(rect.left() + 22.0, middle), Align2::CENTER_CENTER, symbol, glyph(17.0), MUTED);
+    ui.painter().text(
+        pos2(rect.left() + 22.0, middle),
+        Align2::CENTER_CENTER,
+        symbol,
+        glyph(17.0),
+        theme::muted(),
+    );
     let track = Rect::from_center_size(pos2(rect.right() - 27.0 - SLIDER_WIDTH / 2.0, middle), vec2(SLIDER_WIDTH, 4.0));
     let name_width = track.left() - rect.left() - 100.0;
     label(
@@ -2265,15 +2355,15 @@ fn slider_row(ui: &mut Ui, size: Vec2, symbol: &str, text: &str, value: f32, ena
         Align2::LEFT_CENTER,
         text,
         medium(13.5),
-        TEXT,
+        theme::text(),
         name_width,
     );
     let fraction = (value - OVERLAY_OPACITY_MIN) / (1.0 - OVERLAY_OPACITY_MIN);
     let reach = pos2(track.left() + track.width() * fraction, middle);
     ui.painter().rect_filled(track, 2.0, veil(0.16));
     ui.painter()
-        .rect_filled(Rect::from_min_max(track.min, pos2(reach.x, track.bottom())), 2.0, ACCENT);
-    ui.painter().circle_filled(reach, 7.0, TEXT);
+        .rect_filled(Rect::from_min_max(track.min, pos2(reach.x, track.bottom())), 2.0, theme::accent());
+    ui.painter().circle_filled(reach, 7.0, theme::text());
     let percent = format!("{}%", (value * 100.0).round());
     label(
         ui,
@@ -2281,7 +2371,7 @@ fn slider_row(ui: &mut Ui, size: Vec2, symbol: &str, text: &str, value: f32, ena
         Align2::RIGHT_CENTER,
         &percent,
         sans(12.5),
-        MUTED,
+        theme::muted(),
         60.0,
     );
     if !enabled {
@@ -2337,7 +2427,7 @@ fn overlay_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
     }
     let text = "Opens with the Show / hide overlay hotkey, which needs global hotkeys on. Drag it to move it.";
     let at = pos2(card.left() + 4.0, card.bottom() + SECTION_GAP / 2.0);
-    label(ui, at, Align2::LEFT_CENTER, text, sans(12.0), FAINT, card.width());
+    label(ui, at, Align2::LEFT_CENTER, text, sans(12.0), theme::faint(), card.width());
 }
 
 fn settings(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
@@ -2346,7 +2436,7 @@ fn settings(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
     ui.add_space(8.0);
     let (title, _) = ui.allocate_exact_size(vec2(full, 76.0), Sense::hover());
     let at = pos2(title.left() + (full - width) / 2.0, title.bottom() - 12.0);
-    label(ui, at, Align2::LEFT_BOTTOM, "Settings", display(40.0), TEXT, width);
+    label(ui, at, Align2::LEFT_BOTTOM, "Settings", display(40.0), theme::text(), width);
     discord_section(ui, app, out);
     hotkey_section(ui, app, out);
     window_section(ui, app, out);
@@ -2359,8 +2449,16 @@ fn nav_item(ui: &mut Ui, symbol: &str, text: &str, active: bool, trailing: &str)
     let hover = hover_of(ui, &response);
     ui.painter()
         .rect_filled(rect, ROW_RADIUS, veil(if active { 0.08 } else { 0.05 * hover }));
-    let tone = if active { TEXT } else { MUTED.lerp_to_gamma(TEXT, hover) };
-    let (font, color) = if active { (solid(19.0), ACCENT) } else { (glyph(19.0), tone) };
+    let tone = if active {
+        theme::text()
+    } else {
+        theme::muted().lerp_to_gamma(theme::text(), hover)
+    };
+    let (font, color) = if active {
+        (solid(19.0), theme::accent())
+    } else {
+        (glyph(19.0), tone)
+    };
     ui.painter().text(
         pos2(rect.left() + 24.0, rect.center().y),
         Align2::CENTER_CENTER,
@@ -2383,7 +2481,7 @@ fn nav_item(ui: &mut Ui, symbol: &str, text: &str, active: bool, trailing: &str)
         Align2::RIGHT_CENTER,
         trailing,
         sans(12.5),
-        FAINT,
+        theme::faint(),
         40.0,
     );
     describe(&response, text);
@@ -2391,9 +2489,10 @@ fn nav_item(ui: &mut Ui, symbol: &str, text: &str, active: bool, trailing: &str)
 }
 
 fn mark(ui: &Ui, center: Pos2, radius: f32) {
-    ui.painter().circle_filled(center, radius, ACCENT);
-    ui.painter().circle_stroke(center, radius * 0.55, Stroke::new(radius * 0.09, PANEL));
-    ui.painter().circle_filled(center, radius * 0.18, PANEL);
+    ui.painter().circle_filled(center, radius, theme::accent());
+    ui.painter()
+        .circle_stroke(center, radius * 0.55, Stroke::new(radius * 0.09, theme::panel()));
+    ui.painter().circle_filled(center, radius * 0.18, theme::panel());
 }
 
 fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
@@ -2402,8 +2501,13 @@ fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     let (brand, _) = ui.allocate_exact_size(vec2(area.width(), 76.0), Sense::hover());
     let center = pos2(brand.left() + 37.0, brand.center().y + 3.0);
     mark(ui, center, 12.0);
-    ui.painter()
-        .text(pos2(center.x + 22.0, center.y), Align2::LEFT_CENTER, APP_NAME, display(29.0), TEXT);
+    ui.painter().text(
+        pos2(center.x + 22.0, center.y),
+        Align2::LEFT_CENTER,
+        APP_NAME,
+        display(29.0),
+        theme::text(),
+    );
 
     let count = |items: &[Item]| if items.is_empty() { String::new() } else { items.len().to_string() };
     let links = [
@@ -2436,7 +2540,13 @@ fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     let entries: Vec<&Item> = pinned.iter().chain(own).collect();
     if entries.is_empty() {
         Frame::new().inner_margin(Margin::symmetric(26, 4)).show(ui, |ui| {
-            paragraph(ui, "Save an album, playlist or artist and it stays here.", sans(13.0), FAINT, 3);
+            paragraph(
+                ui,
+                "Save an album, playlist or artist and it stays here.",
+                sans(13.0),
+                theme::faint(),
+                3,
+            );
         });
         return;
     }
@@ -2459,7 +2569,7 @@ fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
                 Align2::LEFT_CENTER,
                 &item.title,
                 medium(13.5),
-                TEXT,
+                theme::text(),
                 width,
             );
             label(
@@ -2468,7 +2578,7 @@ fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
                 Align2::LEFT_CENTER,
                 kind,
                 sans(12.5),
-                MUTED,
+                theme::muted(),
                 width,
             );
             describe(&response, &item.title);
@@ -2486,15 +2596,15 @@ fn update_offer(app: &App, ui: &Ui, slot: Rect, out: &mut Vec<Action>) {
     let response = ui.interact(row, Id::new("update-offer"), Sense::click());
     let hover = hover_of(ui, &response);
     ui.painter()
-        .rect_filled(row, ROW_RADIUS, ACCENT.gamma_multiply(0.14 + 0.08 * hover));
+        .rect_filled(row, ROW_RADIUS, theme::accent().gamma_multiply(0.14 + 0.08 * hover));
     let mark = pos2(row.left() + 24.0, row.center().y);
     if app.updating {
         egui::Spinner::new()
-            .color(ACCENT)
+            .color(theme::accent())
             .paint_at(ui, Rect::from_center_size(mark, Vec2::splat(16.0)));
     } else {
         ui.painter()
-            .text(mark, Align2::CENTER_CENTER, icon::ARROW_CIRCLE_UP, solid(19.0), ACCENT);
+            .text(mark, Align2::CENTER_CENTER, icon::ARROW_CIRCLE_UP, solid(19.0), theme::accent());
     }
     let text = if app.updating {
         "Updating".to_owned()
@@ -2507,7 +2617,7 @@ fn update_offer(app: &App, ui: &Ui, slot: Rect, out: &mut Vec<Action>) {
         Align2::LEFT_CENTER,
         &text,
         medium(13.5),
-        TEXT,
+        theme::text(),
         row.width() - 60.0,
     );
     describe(&response, &text);
@@ -2520,7 +2630,11 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
     ui.painter().hline(foot.x_range(), foot.top(), Stroke::new(1.0, veil(0.06)));
     let mut row = foot.shrink2(vec2(12.0, 10.0));
     let slot = Rect::from_center_size(pos2(row.right() - 20.0, row.center().y), Vec2::splat(34.0));
-    let tone = if *app.route() == Route::Settings { ACCENT } else { MUTED };
+    let tone = if *app.route() == Route::Settings {
+        theme::accent()
+    } else {
+        theme::muted()
+    };
     if icon_button(ui, slot, Id::new("settings"), icon::GEAR_SIX, glyph(17.0), tone, "Settings").clicked() {
         out.push(Action::Go(Route::Settings));
     }
@@ -2542,7 +2656,7 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
                     for channel in &app.accounts {
                         let chosen = channel.page == account.page;
                         let symbol = if chosen { icon::CHECK } else { "" };
-                        let row = menu_row(ui, symbol, glyph(15.0), ACCENT, &channel.name);
+                        let row = menu_row(ui, symbol, glyph(15.0), theme::accent(), &channel.name);
                         row.widget_info(|| WidgetInfo::selected(WidgetType::RadioButton, true, chosen, &channel.name));
                         if row.clicked() && !chosen {
                             out.push(Action::SwitchAccount(channel.clone()));
@@ -2557,7 +2671,7 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
                 Align2::LEFT_CENTER,
                 &account.name,
                 medium(13.5),
-                TEXT,
+                theme::text(),
                 width,
             );
             label(
@@ -2566,11 +2680,21 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
                 Align2::LEFT_CENTER,
                 if switchable { "Switch channel" } else { "Signed in" },
                 sans(12.0),
-                MUTED,
+                theme::muted(),
                 width,
             );
             let slot = Rect::from_center_size(pos2(row.right() - 20.0, mid), Vec2::splat(34.0));
-            if icon_button(ui, slot, Id::new("sign-out"), icon::SIGN_OUT, glyph(17.0), MUTED, "Sign out").clicked() {
+            if icon_button(
+                ui,
+                slot,
+                Id::new("sign-out"),
+                icon::SIGN_OUT,
+                glyph(17.0),
+                theme::muted(),
+                "Sign out",
+            )
+            .clicked()
+            {
                 out.push(Action::SignOut);
             }
         }
@@ -2584,16 +2708,24 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
                 Align2::CENTER_CENTER,
                 icon::USER_CIRCLE,
                 glyph(27.0),
-                MUTED.lerp_to_gamma(TEXT, hover),
+                theme::muted().lerp_to_gamma(theme::text(), hover),
             );
-            label(ui, pos2(left, mid - 9.0), Align2::LEFT_CENTER, "Sign in", medium(13.5), TEXT, width);
+            label(
+                ui,
+                pos2(left, mid - 9.0),
+                Align2::LEFT_CENTER,
+                "Sign in",
+                medium(13.5),
+                theme::text(),
+                width,
+            );
             label(
                 ui,
                 pos2(left, mid + 9.0),
                 Align2::LEFT_CENTER,
                 "Mixes and playlists",
                 sans(12.0),
-                MUTED,
+                theme::muted(),
                 width,
             );
             describe(&response, "Sign in");
@@ -2619,11 +2751,11 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
             let width = ui.available_width();
             let (head, _) = ui.allocate_exact_size(vec2(width, 44.0), Sense::hover());
             ui.painter()
-                .text(head.left_center(), Align2::LEFT_CENTER, "Sign in", display(38.0), TEXT);
+                .text(head.left_center(), Align2::LEFT_CENTER, "Sign in", display(38.0), theme::text());
             let slot = Rect::from_center_size(pos2(head.right() - 16.0, head.center().y), Vec2::splat(34.0));
-            let closed = icon_button(ui, slot, Id::new("sign-in-close"), icon::X, glyph(16.0), MUTED, "Close").clicked();
+            let closed = icon_button(ui, slot, Id::new("sign-in-close"), icon::X, glyph(16.0), theme::muted(), "Close").clicked();
             ui.add_space(8.0);
-            paragraph(ui, "Your own home feed and playlists from YouTube Music.", sans(14.0), MUTED, 2);
+            paragraph(ui, "Your own home feed and playlists from YouTube Music.", sans(14.0), theme::muted(), 2);
             ui.add_space(24.0);
 
             let (row, _) = ui.allocate_exact_size(vec2(width, 42.0), Sense::hover());
@@ -2635,7 +2767,7 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
                 ui,
                 "Opens a separate Chrome, Edge, Brave, Firefox or a similar browser window. Sign in to Google there and it closes by itself.",
                 sans(13.0),
-                MUTED,
+                theme::muted(),
                 3,
             );
             ui.add_space(22.0);
@@ -2647,7 +2779,7 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
                 "3.  Copy the whole cookie value under Request Headers, paste it here, then close that window without signing out.",
             ];
             for step in steps {
-                paragraph(ui, step, sans(13.0), MUTED, 2);
+                paragraph(ui, step, sans(13.0), theme::muted(), 2);
                 ui.add_space(5.0);
             }
             ui.add_space(7.0);
@@ -2659,8 +2791,8 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
                     .desired_width(f32::INFINITY)
                     .desired_rows(3)
                     .font(FontId::monospace(11.5))
-                    .text_color(TEXT)
-                    .hint_text(RichText::new("SID=...; SAPISID=...; LOGIN_INFO=...").color(FAINT));
+                    .text_color(theme::text())
+                    .hint_text(RichText::new("SID=...; SAPISID=...; LOGIN_INFO=...").color(theme::faint()));
                 ui.add(edit);
             });
             ui.painter().set(
@@ -2686,17 +2818,17 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
             if !sign_in.status.is_empty() {
                 ui.add_space(18.0);
                 let indent = if sign_in.busy { 26.0 } else { 0.0 };
-                let status = fit(ui, &sign_in.status, medium(13.0), TEXT, width - indent, 3);
+                let status = fit(ui, &sign_in.status, medium(13.0), theme::text(), width - indent, 3);
                 let (row, _) = ui.allocate_exact_size(vec2(width, status.size().y.max(18.0)), Sense::hover());
                 if sign_in.busy {
                     egui::Spinner::new()
-                        .color(ACCENT)
+                        .color(theme::accent())
                         .paint_at(ui, Rect::from_min_size(row.min + vec2(0.0, 1.0), Vec2::splat(16.0)));
                 }
-                ui.painter().galley(row.min + vec2(indent, 0.0), status, TEXT);
+                ui.painter().galley(row.min + vec2(indent, 0.0), status, theme::text());
             }
             ui.add_space(20.0);
-            paragraph(ui, crate::auth::SESSION_KEPT, sans(12.0), FAINT, 2);
+            paragraph(ui, crate::auth::SESSION_KEPT, sans(12.0), theme::faint(), 2);
             closed
         });
     if modal.inner || modal.should_close() {
@@ -2721,10 +2853,24 @@ fn browser_picker(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
             ui.set_width(340.0);
             let width = ui.available_width();
             let (head, _) = ui.allocate_exact_size(vec2(width, 40.0), Sense::hover());
-            ui.painter()
-                .text(head.left_center(), Align2::LEFT_CENTER, "Choose a browser", display(30.0), TEXT);
+            ui.painter().text(
+                head.left_center(),
+                Align2::LEFT_CENTER,
+                "Choose a browser",
+                display(30.0),
+                theme::text(),
+            );
             let slot = Rect::from_center_size(pos2(head.right() - 16.0, head.center().y), Vec2::splat(34.0));
-            let closed = icon_button(ui, slot, Id::new("browser-picker-close"), icon::X, glyph(16.0), MUTED, "Close").clicked();
+            let closed = icon_button(
+                ui,
+                slot,
+                Id::new("browser-picker-close"),
+                icon::X,
+                glyph(16.0),
+                theme::muted(),
+                "Close",
+            )
+            .clicked();
             ui.add_space(16.0);
             for (index, browser) in sign_in.browsers.iter().enumerate() {
                 let (row, _) = ui.allocate_exact_size(vec2(width, 56.0), Sense::hover());
@@ -2752,14 +2898,14 @@ fn browser_tile(ui: &Ui, at: Pos2, width: f32, name: &str, last_used: bool) -> R
     };
     ui.painter().rect_filled(body, 14.0, veil(0.06 + 0.06 * hover));
     let logo = Rect::from_center_size(pos2(rect.left() + 32.0, rect.center().y), Vec2::splat(28.0));
-    browser_logo(ui, name, logo, TEXT);
+    browser_logo(ui, name, logo, theme::text());
     label(
         ui,
         pos2(rect.left() + 62.0, rect.center().y),
         Align2::LEFT_CENTER,
         name,
         medium(14.5),
-        TEXT,
+        theme::text(),
         width - 170.0,
     );
     if last_used {
@@ -2769,7 +2915,7 @@ fn browser_tile(ui: &Ui, at: Pos2, width: f32, name: &str, last_used: bool) -> R
             Align2::RIGHT_CENTER,
             "Last used",
             sans(12.0),
-            MUTED,
+            theme::muted(),
             90.0,
         );
     }
@@ -2819,9 +2965,9 @@ fn queue_panel(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     let tint = cover
         .and_then(|cover| app.art.get(ui.ctx(), cover, BAR_ART))
         .map(|picture| picture.tint);
-    let glow = mood(ui, "queue-glow", tint, PANEL, 0.3);
+    let glow = mood(ui, "queue-glow", tint, theme::panel(), 0.3);
     let haze = Rect::from_min_size(area.min, vec2(area.width(), AMBIENT_HEIGHT.min(area.height())));
-    wash(ui.painter(), haze, glow, PANEL);
+    wash(ui.painter(), haze, glow, theme::panel());
     ui.painter().vline(area.left() + 0.5, area.y_range(), Stroke::new(1.0, veil(0.06)));
     let Some(item) = app.now_playing() else {
         Frame::new().inner_margin(Margin::same(20)).show(ui, |ui| {
@@ -2854,17 +3000,17 @@ fn queue_panel(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
             Align2::CENTER_CENTER,
             icon::ARROWS_OUT_SIMPLE,
             glyph(22.0),
-            TEXT.gamma_multiply(lift),
+            theme::text().gamma_multiply(lift),
         );
         describe(&cover, "Now playing");
         if cover.clicked() {
             out.push(Action::Expand(true));
         }
         let left = art.right() + 14.0;
-        let title = fit(ui, &item.title, bold(15.5), TEXT, head.right() - left, 2);
+        let title = fit(ui, &item.title, bold(15.5), theme::text(), head.right() - left, 2);
         let top = head.center().y - (title.size().y + 22.0) / 2.0;
         let below = pos2(left, top + title.size().y + 12.0);
-        ui.painter().galley(pos2(left, top), title, TEXT);
+        ui.painter().galley(pos2(left, top), title, theme::text());
         byline(ui, out, item, Id::new("queue-artist"), below, sans(13.0), head.right() - left);
     });
     ui.add_space(26.0);
@@ -2886,12 +3032,16 @@ fn queue_panel(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
 }
 
 fn tab(ui: &Ui, at: Pos2, text: &str, active: bool) -> Response {
-    let galley = fit(ui, text, medium(13.5), TEXT, 160.0, 1);
+    let galley = fit(ui, text, medium(13.5), theme::text(), 160.0, 1);
     let rect = Rect::from_min_size(at, vec2(galley.size().x + 28.0, 32.0));
     let response = ui.interact(rect, Id::new(("tab", text)), Sense::click());
     let hover = hover_of(ui, &response);
     ui.painter().rect_filled(rect, 16.0, veil(if active { 0.12 } else { 0.06 * hover }));
-    let ink = if active { TEXT } else { MUTED.lerp_to_gamma(TEXT, hover) };
+    let ink = if active {
+        theme::text()
+    } else {
+        theme::muted().lerp_to_gamma(theme::text(), hover)
+    };
     ui.painter()
         .galley_with_override_text_color(rect.center() - galley.size() / 2.0, galley, ink);
     describe(&response, text);
@@ -2944,13 +3094,13 @@ fn lyrics_view(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
             ui.add_space(18.0);
             continue;
         }
-        let galley = fit(ui, line, bold(20.0), TEXT, width, 4);
+        let galley = fit(ui, line, bold(20.0), theme::text(), width, 4);
         let reading = lyrics
             .romanized
             .get(index)
             .and_then(Option::as_deref)
             .filter(|_| romanized)
-            .map(|reading| fit(ui, reading, sans(15.0), TEXT, width, 3));
+            .map(|reading| fit(ui, reading, sans(15.0), theme::text(), width, 3));
         let reading_height = reading.as_ref().map_or(0.0, |reading| reading.size().y + 2.0);
         let line_height = galley.size().y;
         let (rect, response) = ui.allocate_exact_size(vec2(width, line_height + reading_height + 14.0), sense);
@@ -2965,7 +3115,7 @@ fn lyrics_view(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
             .ctx()
             .animate_bool_with_time(response.id.with("lit"), current || !lyrics.synced, 0.25);
         let hover = hover_of(ui, &response);
-        let ink = TEXT.gamma_multiply(0.34 + 0.66 * lit.max(0.5 * hover));
+        let ink = theme::text().gamma_multiply(0.34 + 0.66 * lit.max(0.5 * hover));
         ui.painter().galley_with_override_text_color(rect.min + vec2(0.0, 7.0), galley, ink);
         if let Some(reading) = reading {
             let tone = ink.gamma_multiply(0.7);
@@ -2980,7 +3130,7 @@ fn lyrics_view(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
         }
     }
     ui.add_space(12.0);
-    paragraph(ui, &lyrics.source, sans(12.0), FAINT, 2);
+    paragraph(ui, &lyrics.source, sans(12.0), theme::faint(), 2);
     let next = sung.map_or(0, |index| index + 1);
     if let (true, Some((start, _))) = (lyrics.synced && app.playing(), lyrics.lines.get(next)) {
         let wait = start.saturating_sub(position).max(30);
@@ -3067,16 +3217,19 @@ fn queue_rows(app: &App, ui: &mut Ui, heading: bool, out: &mut Vec<Action>) -> b
             row.set_opacity(0.55);
         }
         if is_current {
-            ui.painter()
-                .rect_filled(slot.expand2(vec2(8.0, 0.0)), ROW_RADIUS, ACCENT.gamma_multiply(0.14 + 0.08 * hover));
+            ui.painter().rect_filled(
+                slot.expand2(vec2(8.0, 0.0)),
+                ROW_RADIUS,
+                theme::accent().gamma_multiply(0.14 + 0.08 * hover),
+            );
         }
-        let ink = if is_current { ACCENT } else { TEXT };
+        let ink = if is_current { theme::accent() } else { theme::text() };
         let (below, width) = queue_row(&row, &app.art, app.saved.covers.of(item), &item.title, slot, hover, ink);
         byline(&row, out, item, response.id.with("artist"), below, sans(12.5), width);
         describe(response, &item.title);
         if hover > 0.0 && !is_current {
             let close = Rect::from_center_size(pos2(slot.right() - 12.0, slot.center().y), Vec2::splat(28.0));
-            let tone = MUTED.gamma_multiply(hover);
+            let tone = theme::muted().gamma_multiply(hover);
             if icon_button(
                 ui,
                 close,
@@ -3115,16 +3268,24 @@ fn queue_rows(app: &App, ui: &mut Ui, heading: bool, out: &mut Vec<Action>) -> b
         color: shade(0.5),
     };
     ghost.painter().add(shadow.as_shape(plate, ROW_RADIUS));
-    ghost.painter().rect_filled(plate, ROW_RADIUS, FLOATING);
+    ghost.painter().rect_filled(plate, ROW_RADIUS, theme::floating());
     let item = &queue[from];
-    let (below, width) = queue_row(&ghost, &app.art, app.saved.covers.of(item), &item.title, lifted, 0.0, TEXT);
-    label(&ghost, below, Align2::LEFT_CENTER, &item.subtitle, sans(12.5), MUTED, width);
+    let (below, width) = queue_row(&ghost, &app.art, app.saved.covers.of(item), &item.title, lifted, 0.0, theme::text());
+    label(
+        &ghost,
+        below,
+        Align2::LEFT_CENTER,
+        &item.subtitle,
+        sans(12.5),
+        theme::muted(),
+        width,
+    );
     true
 }
 
 fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
     let area = ui.max_rect();
-    let Some(item) = app.now_playing() else { return PANEL };
+    let Some(item) = app.now_playing() else { return theme::panel() };
     let shown = entrance(ui, Id::new("now-playing"));
     ui.set_opacity(shown);
     let cover = app.saved.covers.of(item);
@@ -3132,22 +3293,32 @@ fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
     let stage = Rect::from_min_max(area.min, pos2(area.right() - column - 24.0, area.bottom()));
     let side = (stage.width() - 96.0).min(stage.height() - 230.0).clamp(120.0, STAGE_ART);
     let tint = |size: f32| app.art.get(ui.ctx(), cover, size).map(|picture| picture.tint);
-    let glow = mood(ui, "stage", tint(side).or_else(|| tint(BAR_ART)), PANEL, 0.46);
+    let glow = mood(ui, "stage", tint(side).or_else(|| tint(BAR_ART)), theme::panel(), 0.46);
     let mut glow = dimmed(glow, STAGE_LUMINANCE);
     match app.art.get(ui.ctx(), cover, 1.0) {
         Some(blur) => {
             let fill = Rect::from_center_size(area.center(), Vec2::splat(area.width().max(area.height())));
             let dark = Color32::from_gray(STAGE_BLUR);
             egui::Image::from_texture((blur.id, fill.size())).tint(dark).paint_at(ui, fill);
-            wash(ui.painter(), area, Color32::TRANSPARENT, PANEL);
+            wash(ui.painter(), area, Color32::TRANSPARENT, theme::panel());
             let scale = |channel: u8| (channel as u16 * STAGE_BLUR as u16 / 255) as u8;
             glow = Color32::from_rgb(scale(blur.tint.r()), scale(blur.tint.g()), scale(blur.tint.b()));
         }
-        None => wash(ui.painter(), area, glow, PANEL),
+        None => wash(ui.painter(), area, glow, theme::panel()),
     }
 
     let close = Rect::from_center_size(area.min + vec2(44.0, 42.0), Vec2::splat(38.0));
-    if icon_button(ui, close, Id::new("stage-close"), icon::CARET_DOWN, glyph(19.0), MUTED, "Collapse").clicked() {
+    if icon_button(
+        ui,
+        close,
+        Id::new("stage-close"),
+        icon::CARET_DOWN,
+        glyph(19.0),
+        theme::muted(),
+        "Collapse",
+    )
+    .clicked()
+    {
         out.push(Action::Expand(false));
     }
 
@@ -3167,8 +3338,8 @@ fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
         19..=40 => 42.0,
         _ => 34.0,
     };
-    let title = centered(&item.title, display(size), TEXT, 2);
-    let artist = centered(&item.subtitle, sans(16.0), MUTED, 1);
+    let title = centered(&item.title, display(size), theme::text(), 2);
+    let artist = centered(&item.subtitle, sans(16.0), theme::muted(), 1);
     let block = side + 30.0 + title.size().y + 8.0 + artist.size().y;
     let top = (stage.center().y - block / 2.0).max(stage.top() + 56.0);
     let art = Rect::from_min_size(pos2(stage.center().x - side / 2.0, top), Vec2::splat(side));
@@ -3182,9 +3353,9 @@ fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
     artwork(ui, &app.art, cover, art, 18.0);
     let below = art.bottom() + 30.0;
     let lower = below + title.size().y + 8.0;
-    ui.painter().galley(pos2(stage.center().x, below), title, TEXT);
+    ui.painter().galley(pos2(stage.center().x, below), title, theme::text());
     let origin = pos2(stage.center().x, lower);
-    ui.painter().galley(origin, artist.clone(), MUTED);
+    ui.painter().galley(origin, artist.clone(), theme::muted());
     artist_links(ui, out, item, Id::new("stage-artist"), origin, &artist, &item.subtitle);
 
     let card = Rect::from_min_max(
@@ -3222,7 +3393,7 @@ fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
                 }
             });
         });
-    PANEL.lerp_to_gamma(glow, shown)
+    theme::panel().lerp_to_gamma(glow, shown)
 }
 
 fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
@@ -3234,7 +3405,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     let tint = cover
         .and_then(|cover| app.art.get(ui.ctx(), cover, BAR_ART))
         .map(|picture| picture.tint);
-    wash(ui.painter(), bar, PANEL, mood(ui, "bar-glow", tint, PANEL, 0.16));
+    wash(ui.painter(), bar, theme::panel(), mood(ui, "bar-glow", tint, theme::panel(), 0.16));
     let backdrop = ui.interact(bar, Id::new("bar-backdrop"), Sense::click());
     if backdrop.clicked() && item.is_some() {
         out.push(Action::Expand(!app.expanded));
@@ -3278,17 +3449,22 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
                 Align2::LEFT_CENTER,
                 &item.title,
                 medium(14.0),
-                TEXT,
+                theme::text(),
                 width,
             );
-            let reach = left + fit(ui, &item.subtitle, sans(12.5), MUTED, width, 1).size().x;
+            let reach = left + fit(ui, &item.subtitle, sans(12.5), theme::muted(), width, 1).size().x;
             let zone = Rect::from_min_max(art.min, pos2(title.right().max(reach), art.bottom()));
             let open = ui.interact(zone, Id::new("bar-now-playing"), Sense::click());
             let lift = hover_of(ui, &open);
             let symbol = if app.expanded { icon::CARET_DOWN } else { icon::CARET_UP };
             ui.painter().rect_filled(art, 6.0, shade(0.55 * lift));
-            ui.painter()
-                .text(art.center(), Align2::CENTER_CENTER, symbol, glyph(20.0), TEXT.gamma_multiply(lift));
+            ui.painter().text(
+                art.center(),
+                Align2::CENTER_CENTER,
+                symbol,
+                glyph(20.0),
+                theme::text().gamma_multiply(lift),
+            );
             describe(&open, "Now playing");
             if open.clicked() {
                 out.push(Action::Expand(!app.expanded));
@@ -3298,9 +3474,9 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
             let liked = app.saved.liked.iter().any(|liked| liked.video_id == item.video_id);
             let slot = Rect::from_center_size(pos2(title.right().max(artist.right()) + 26.0, mid), Vec2::splat(34.0));
             let (font, color, hint) = if liked {
-                (solid(17.0), ACCENT, "Remove from Liked songs")
+                (solid(17.0), theme::accent(), "Remove from Liked songs")
             } else {
-                (glyph(17.0), MUTED, "Add to Liked songs")
+                (glyph(17.0), theme::muted(), "Add to Liked songs")
             };
             if icon_button(ui, slot, Id::new("bar-like"), icon::HEART, font, color, hint).clicked() {
                 out.push(Action::Like(item.clone()));
@@ -3312,7 +3488,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
                 Id::new("bar-share"),
                 icon::SHARE_NETWORK,
                 glyph(16.0),
-                MUTED,
+                theme::muted(),
                 "Copy playback URL",
             )
             .clicked()
@@ -3324,14 +3500,14 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
             let art = Rect::from_min_size(pos2(bar.left() + 18.0, mid - BAR_ART / 2.0), Vec2::splat(BAR_ART));
             ui.painter().rect_filled(art, 6.0, veil(0.05));
             ui.painter()
-                .text(art.center(), Align2::CENTER_CENTER, icon::VINYL_RECORD, glyph(22.0), FAINT);
+                .text(art.center(), Align2::CENTER_CENTER, icon::VINYL_RECORD, glyph(22.0), theme::faint());
             label(
                 ui,
                 pos2(art.right() + 14.0, mid),
                 Align2::LEFT_CENTER,
                 "Nothing playing",
                 sans(13.5),
-                FAINT,
+                theme::faint(),
                 200.0,
             );
         }
@@ -3344,11 +3520,11 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     let lift = hover_of(ui, &toggle);
     let pressed = if toggle.is_pointer_button_down_on() { 1.0 } else { 0.0 };
     ui.painter()
-        .circle_filled(center, 20.0 + lift - pressed, if active { TEXT } else { veil(0.14) });
+        .circle_filled(center, 20.0 + lift - pressed, if active { theme::text() } else { veil(0.14) });
     let failed = app.player.failed() && !app.player.loading();
     if app.player.loading() {
         egui::Spinner::new()
-            .color(PANEL)
+            .color(theme::panel())
             .paint_at(ui, Rect::from_center_size(center, Vec2::splat(18.0)));
     } else {
         let symbol = if failed {
@@ -3363,7 +3539,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
             Align2::CENTER_CENTER,
             symbol,
             solid(19.0),
-            if active { PANEL } else { FAINT },
+            if active { theme::panel() } else { theme::faint() },
         );
     }
     let name = if failed {
@@ -3378,7 +3554,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
         out.push(Action::Toggle);
     }
     let around = |offset: f32, size: f32| Rect::from_center_size(center + vec2(offset, 0.0), Vec2::splat(size));
-    let tone = if active { TEXT } else { FAINT };
+    let tone = if active { theme::text() } else { theme::faint() };
     if icon_button(
         ui,
         around(-56.0, 36.0),
@@ -3405,7 +3581,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     {
         out.push(Action::Next);
     }
-    let shuffle = if app.saved.shuffle { ACCENT } else { MUTED };
+    let shuffle = if app.saved.shuffle { theme::accent() } else { theme::muted() };
     if icon_button(
         ui,
         around(-104.0, 34.0),
@@ -3420,9 +3596,9 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
         out.push(Action::ToggleShuffle);
     }
     let (symbol, repeat, hint) = match app.saved.repeat {
-        Repeat::Off => (icon::REPEAT, MUTED, "Repeat"),
-        Repeat::All => (icon::REPEAT, ACCENT, "Repeat one"),
-        Repeat::One => (icon::REPEAT_ONCE, ACCENT, "Stop repeating"),
+        Repeat::Off => (icon::REPEAT, theme::muted(), "Repeat"),
+        Repeat::All => (icon::REPEAT, theme::accent(), "Repeat one"),
+        Repeat::One => (icon::REPEAT_ONCE, theme::accent(), "Stop repeating"),
     };
     if icon_button(ui, around(104.0, 34.0), Id::new("bar-repeat"), symbol, glyph(17.0), repeat, hint).clicked() {
         out.push(Action::CycleRepeat);
@@ -3449,8 +3625,9 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     let line = Rect::from_center_size(track.center(), vec2(track.width(), 4.0));
     let level = Rect::from_min_size(line.min, vec2(line.width() * volume, 4.0));
     ui.painter().rect_filled(line, 2.0, veil(0.14));
-    ui.painter().rect_filled(level, 2.0, TEXT.lerp_to_gamma(ACCENT, grip));
-    ui.painter().circle_filled(pos2(level.right(), mid), 6.0 * grip, TEXT);
+    ui.painter()
+        .rect_filled(level, 2.0, theme::text().lerp_to_gamma(theme::accent(), grip));
+    ui.painter().circle_filled(pos2(level.right(), mid), 6.0 * grip, theme::text());
     slider.widget_info(|| WidgetInfo::slider(true, volume as f64, "Volume"));
     right -= 96.0 + 22.0;
 
@@ -3468,7 +3645,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
         Id::new("bar-mute"),
         symbol,
         glyph(18.0),
-        MUTED,
+        theme::muted(),
         "Mute",
     )
     .clicked()
@@ -3478,7 +3655,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
         out.push(Action::Volume(if volume > 0.0 { 0.0 } else { restored }));
     }
     right -= 38.0;
-    let queue = if app.saved.queue_open { ACCENT } else { MUTED };
+    let queue = if app.saved.queue_open { theme::accent() } else { theme::muted() };
     if icon_button(
         ui,
         Rect::from_center_size(pos2(right, mid), Vec2::splat(34.0)),
@@ -3500,7 +3677,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
         Id::new("bar-lyrics"),
         icon::SUBTITLES,
         glyph(18.0),
-        if singing { ACCENT } else { MUTED },
+        if singing { theme::accent() } else { theme::muted() },
         "Lyrics",
     )
     .clicked()
@@ -3511,7 +3688,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     right -= 34.0;
     if duration > 0 {
         let time = format!("{}  /  {}", clock(position), clock(duration));
-        label(ui, pos2(right, mid), Align2::RIGHT_CENTER, &time, sans(12.5), MUTED, 140.0);
+        label(ui, pos2(right, mid), Align2::RIGHT_CENTER, &time, sans(12.5), theme::muted(), 140.0);
     }
     scrub
 }
@@ -3522,19 +3699,19 @@ fn paint_scrubber(ctx: &egui::Context, scrub: &Scrub) {
     let span = |fraction: f32| Rect::from_min_size(scrub.bar.min - vec2(0.0, height / 2.0), vec2(scrub.bar.width() * fraction, height));
     painter.rect_filled(span(1.0), 0.0, rgb(0x26272C));
     painter.rect_filled(span(scrub.buffered), 0.0, rgb(0x45474E));
-    painter.rect_filled(span(scrub.played), 0.0, ACCENT);
-    painter.circle_filled(pos2(span(scrub.played).right(), scrub.bar.top()), 6.0 * scrub.hover, TEXT);
+    painter.rect_filled(span(scrub.played), 0.0, theme::accent());
+    painter.circle_filled(pos2(span(scrub.played).right(), scrub.bar.top()), 6.0 * scrub.hover, theme::text());
 
     let Some((fraction, ms)) = scrub.aim else { return };
     let mut painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, Id::new("scrub-time")));
     painter.set_opacity(scrub.hover);
-    let text = painter.layout_no_wrap(clock(ms), medium(12.5), TEXT);
+    let text = painter.layout_no_wrap(clock(ms), medium(12.5), theme::text());
     let size = text.size() + vec2(20.0, 12.0);
     let reach = (scrub.bar.width() - size.x) / 2.0 - 8.0;
     let x = scrub.bar.center().x + (scrub.bar.width() * (fraction - 0.5)).clamp(-reach, reach);
     let bubble = Rect::from_center_size(pos2(x, scrub.bar.top() - 14.0 - size.y / 2.0), size);
-    painter.rect(bubble, 9.0, FLOATING, Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
-    painter.galley(bubble.center() - text.size() / 2.0, text, TEXT);
+    painter.rect(bubble, 9.0, theme::floating(), Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
+    painter.galley(bubble.center() - text.size() / 2.0, text, theme::text());
 }
 
 fn notice(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
@@ -3544,14 +3721,20 @@ fn notice(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
         .anchor(Align2::CENTER_BOTTOM, vec2(0.0, -(BAR_HEIGHT + 22.0)))
         .interactable(notice.action.is_some())
         .show(ctx, |ui| {
-            let text = fit(ui, &notice.text, medium(13.5), PANEL, 420.0, 2);
-            let button = notice.action.as_ref().map(|(name, _)| fit(ui, name, bold(13.0), TEXT, 160.0, 1));
+            let text = fit(ui, &notice.text, medium(13.5), theme::panel(), 420.0, 2);
+            let button = notice
+                .action
+                .as_ref()
+                .map(|(name, _)| fit(ui, name, bold(13.0), theme::text(), 160.0, 1));
             let button_width = button.as_ref().map_or(0.0, |name| name.size().x + 28.0 + 14.0);
             let height = (text.size().y + 24.0).max(44.0);
             let (toast, _) = ui.allocate_exact_size(vec2(20.0 + text.size().x + button_width + 20.0, height), Sense::hover());
-            ui.painter().rect_filled(toast, 22.0, TEXT);
-            ui.painter()
-                .galley(pos2(toast.left() + 20.0, toast.center().y - text.size().y / 2.0), text, PANEL);
+            ui.painter().rect_filled(toast, 22.0, theme::text());
+            ui.painter().galley(
+                pos2(toast.left() + 20.0, toast.center().y - text.size().y / 2.0),
+                text,
+                theme::panel(),
+            );
             let (Some(name), Some((hint, action))) = (button, &notice.action) else {
                 return;
             };
@@ -3561,8 +3744,9 @@ fn notice(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
             );
             let response = ui.interact(slot, Id::new("notice-action"), Sense::click());
             let hover = hover_of(ui, &response);
-            ui.painter().rect_filled(slot, 15.0, PANEL.lerp_to_gamma(ACCENT, hover));
-            let ink = TEXT.lerp_to_gamma(ON_ACCENT, hover);
+            ui.painter()
+                .rect_filled(slot, 15.0, theme::panel().lerp_to_gamma(theme::accent(), hover));
+            let ink = theme::text().lerp_to_gamma(theme::on_accent(), hover);
             ui.painter()
                 .galley_with_override_text_color(slot.center() - name.size() / 2.0, name, ink);
             describe(&response, hint);
@@ -3581,7 +3765,7 @@ fn release_notes(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
         .anchor(Align2::LEFT_BOTTOM, vec2(12.0, -(BAR_HEIGHT + ACCOUNT_HEIGHT + 8.0)))
         .show(ctx, |ui| {
             Frame::new()
-                .fill(FLOATING)
+                .fill(theme::floating())
                 .stroke(Stroke::new(1.0, veil(0.1)))
                 .corner_radius(12)
                 .inner_margin(Margin::same(16))
@@ -3595,16 +3779,26 @@ fn release_notes(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
                         Align2::LEFT_CENTER,
                         &title,
                         bold(14.0),
-                        TEXT,
+                        theme::text(),
                         NOTES_WIDTH - 32.0,
                     );
                     let slot = Rect::from_center_size(pos2(head.right() - 10.0, head.center().y), Vec2::splat(28.0));
-                    if icon_button(ui, slot, Id::new("release-notes-close"), icon::X, glyph(14.0), MUTED, "Close").clicked() {
+                    if icon_button(
+                        ui,
+                        slot,
+                        Id::new("release-notes-close"),
+                        icon::X,
+                        glyph(14.0),
+                        theme::muted(),
+                        "Close",
+                    )
+                    .clicked()
+                    {
                         out.push(Action::CloseNotes);
                     }
                     ui.add_space(6.0);
                     for note in &app.notes {
-                        paragraph(ui, &format!("•  {note}"), sans(13.0), MUTED, 3);
+                        paragraph(ui, &format!("•  {note}"), sans(13.0), theme::muted(), 3);
                         ui.add_space(4.0);
                     }
                 });
@@ -3664,11 +3858,11 @@ mod tests {
     fn keeps_the_now_playing_tint_dark_enough_for_white_text() {
         let contrast = |ink: Color32, paper: Color32| (luminance(ink) + 0.05) / (luminance(paper) + 0.05);
         let pale = rgb(0x86917F);
-        assert!(contrast(TEXT, pale) < 3.0);
+        assert!(contrast(theme::text(), pale) < 3.0);
         let tint = dimmed(pale, STAGE_LUMINANCE);
-        assert!(contrast(TEXT, tint) > 4.5);
+        assert!(contrast(theme::text(), tint) > 4.5);
         assert!(tint.g() > tint.r() && tint.r() > tint.b());
-        assert_eq!(dimmed(PANEL, STAGE_LUMINANCE), PANEL);
+        assert_eq!(dimmed(theme::panel(), STAGE_LUMINANCE), theme::panel());
     }
 
     #[test]
@@ -3685,7 +3879,7 @@ mod tests {
                 .chars()
                 .filter(|c| ctx.fonts_mut(|fonts| fonts.has_glyph(&sans(16.0), *c)))
                 .collect();
-            let galley = ctx.fonts_mut(|fonts| fonts.layout_no_wrap(text.clone(), sans(16.0), TEXT));
+            let galley = ctx.fonts_mut(|fonts| fonts.layout_no_wrap(text.clone(), sans(16.0), theme::text()));
             let blank = galley
                 .rows
                 .iter()

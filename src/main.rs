@@ -14,6 +14,7 @@ mod parked;
 mod playback;
 mod player;
 mod romanize;
+mod theme;
 mod tray;
 mod ui;
 mod update;
@@ -88,6 +89,7 @@ fn log_crashes() {
 }
 
 fn main() -> eframe::Result {
+    theme::load();
     let mut arguments: Vec<String> = std::env::args().skip(1).collect();
     take_profile(&mut arguments);
     log_crashes();
