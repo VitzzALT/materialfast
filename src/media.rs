@@ -355,7 +355,9 @@ async fn follow(player: &mpris_server::Player, track: &mut (String, u64), update
             metadata.set_artist(Some([item.credit()]));
             let cover = crate::ytm::sized(&item.thumb, COVER_PX);
             metadata.set_art_url(Some(cover).filter(|cover| !cover.is_empty()));
-            metadata.set_length(Some(Time::from_millis(update.duration_ms as i64)).filter(|_| update.duration_ms > 0));
+            if update.duration_ms > 0 {
+                metadata.set_length(Some(Time::from_millis(update.duration_ms as i64)));
+            }
         }
         let _ = player.set_metadata(metadata).await;
     }

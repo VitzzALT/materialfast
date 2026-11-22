@@ -1,6 +1,7 @@
 use crate::art::Art;
 use crate::auth;
 use crate::discord::{Discord, Headline};
+use crate::expressive;
 use crate::hotkeys::{self, Combo, Command, Hotkeys};
 use crate::media::Media;
 use crate::playback::{self, Playback, Replaced, Signal};
@@ -98,6 +99,7 @@ pub struct Saved {
     pub overlay_next_up: bool,
     pub notes_seen: String,
     pub browser: String,
+    pub cover_shape: usize,
 }
 
 pub enum Words {
@@ -180,6 +182,7 @@ impl Default for Saved {
             overlay_next_up: true,
             notes_seen: String::new(),
             browser: String::new(),
+            cover_shape: 0,
         }
     }
 }
@@ -268,6 +271,7 @@ pub enum Action {
     OverlaySnapped,
     OverlayControls(bool),
     OverlayNextUp(bool),
+    CycleCoverShape,
 }
 
 enum Event {
@@ -1105,6 +1109,7 @@ impl App {
             Action::OverlaySnapped => self.overlay_snapping = false,
             Action::OverlayControls(shown) => self.saved.overlay_controls = shown,
             Action::OverlayNextUp(shown) => self.saved.overlay_next_up = shown,
+            Action::CycleCoverShape => self.saved.cover_shape = (self.saved.cover_shape + 1) % expressive::COVER_SHAPES.len(),
             Action::Like(item) => {
                 let liked = !self.saved.liked.iter().any(|known| known.key() == item.key());
                 toggle(&mut self.saved.liked, item.clone());

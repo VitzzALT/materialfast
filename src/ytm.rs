@@ -566,6 +566,7 @@ impl Client {
         }
     }
 
+    #[allow(clippy::result_large_err)]
     fn lrclib_lyrics(&self, song: &Item, seconds: u64) -> Option<Lyrics> {
         let seconds = match seconds {
             0 => self.stream(&song.video_id).ok()?.duration_ms / 1000,
@@ -1509,6 +1510,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::result_large_err)]
     fn only_a_401_counts_as_a_rejected_session() {
         let status = |code| Err(ureq::Error::Status(code, ureq::Response::new(code, "status", "").unwrap()));
         assert!(is_unauthorized(&status(401)));

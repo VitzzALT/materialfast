@@ -1,6 +1,7 @@
 use crate::app::{Action, App, Covers, Load, OVERLAY_OPACITY_MIN, Repeat, Route, Words, usable_opacity};
 use crate::art::Art;
 use crate::discord::Headline;
+use crate::expressive::{self, Glyph};
 use crate::hotkeys::{self, Command};
 #[cfg(all(unix, not(target_os = "macos")))]
 use crate::overlay_wayland;
@@ -8,7 +9,7 @@ use crate::theme;
 use crate::ytm::{Item, Layout, Section};
 use crate::{APP_NAME, VERSION};
 use eframe::egui::ecolor::Hsva;
-use eframe::egui::epaint::{RectShape, Shadow};
+use eframe::egui::epaint::{PathShape, PathStroke, RectShape, Shadow};
 use eframe::egui::style::ScrollStyle;
 use eframe::egui::text::{CCursor, LayoutJob, TextFormat, TextWrapping};
 use eframe::egui::{
@@ -32,8 +33,8 @@ const AMBIENT_HEIGHT: f32 = 380.0;
 const HERO_ART: f32 = 216.0;
 const BAR_ART: f32 = 52.0;
 const ROW_HEIGHT: f32 = 56.0;
-const ROW_RADIUS: f32 = 8.0;
-const ART_RADIUS: f32 = 8.0;
+const ROW_RADIUS: f32 = expressive::RADIUS_LG;
+const ART_RADIUS: f32 = expressive::RADIUS_LG;
 const CARD_MIN: f32 = 164.0;
 const CARD_GAP: f32 = 20.0;
 const CARD_TEXT: f32 = 62.0;
@@ -64,7 +65,7 @@ const OVERLAY_PAD: f32 = 14.0;
 const OVERLAY_ART: f32 = 56.0;
 const SLIDER_WIDTH: f32 = 160.0;
 const CARD_PAD: f32 = 6.0;
-const CARD_RADIUS: f32 = 12.0;
+const CARD_RADIUS: f32 = expressive::RADIUS_XL;
 
 const fn rgb(hex: u32) -> Color32 {
     Color32::from_rgb((hex >> 16) as u8, (hex >> 8) as u8, hex as u8)
@@ -72,6 +73,10 @@ const fn rgb(hex: u32) -> Color32 {
 
 fn veil(opacity: f32) -> Color32 {
     Color32::from_white_alpha((opacity.clamp(0.0, 1.0) * 255.0) as u8)
+}
+
+fn translucent(color: Color32, opacity: f32) -> Color32 {
+    Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), (opacity.clamp(0.0, 1.0) * 255.0) as u8)
 }
 
 fn shade(opacity: f32) -> Color32 {
@@ -306,37 +311,46 @@ pub fn install(ctx: &egui::Context) {
     fonts.families.insert(FAMILIES[4].clone(), vec!["phosphor-fill".to_owned()]);
     ctx.set_fonts(fonts);
 
+    restyle(ctx);
+}
+
+pub fn restyle(ctx: &egui::Context) {
     ctx.style_mut(|style| {
         let visuals = &mut style.visuals;
-        *visuals = egui::Visuals::dark();
+        *visuals = if theme::dark() {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        };
         visuals.panel_fill = theme::base();
         visuals.window_fill = theme::floating();
         visuals.extreme_bg_color = theme::panel();
         visuals.override_text_color = Some(theme::text());
-        visuals.window_stroke = Stroke::new(1.0, veil(0.08));
-        visuals.window_corner_radius = 10.into();
-        visuals.menu_corner_radius = 13.into();
+        visuals.window_stroke = Stroke::new(1.0_f32, theme::outline_variant().gamma_multiply(0.55));
+        visuals.window_corner_radius = expressive::RADIUS_XL_INCREASED.into();
+        visuals.menu_corner_radius = expressive::RADIUS_LG_INCREASED.into();
         visuals.popup_shadow = Shadow {
-            offset: [0, 10],
-            blur: 28,
+            offset: [0, 12],
+            blur: 32,
             spread: 0,
-            color: shade(0.5),
+            color: theme::shadow().gamma_multiply(0.45),
         };
-        visuals.selection.bg_fill = theme::accent().gamma_multiply(0.45);
-        visuals.selection.stroke = Stroke::new(1.0, theme::text());
-        visuals.text_cursor.stroke = Stroke::new(1.5, theme::accent());
+        visuals.selection.bg_fill = theme::primary_container();
+        visuals.selection.stroke = Stroke::new(1.0_f32, theme::on_primary_container());
+        visuals.text_cursor.stroke = Stroke::new(1.5_f32, theme::primary());
+        visuals.hyperlink_color = theme::primary();
         visuals.interact_cursor = Some(egui::CursorIcon::PointingHand);
         for (widget, fill) in [
             (&mut visuals.widgets.inactive, Color32::TRANSPARENT),
-            (&mut visuals.widgets.hovered, veil(0.08)),
-            (&mut visuals.widgets.active, veil(0.12)),
-            (&mut visuals.widgets.open, veil(0.08)),
+            (&mut visuals.widgets.hovered, theme::secondary_container().gamma_multiply(0.55)),
+            (&mut visuals.widgets.active, theme::secondary_container()),
+            (&mut visuals.widgets.open, theme::secondary_container().gamma_multiply(0.7)),
         ] {
             widget.bg_fill = fill;
             widget.weak_bg_fill = fill;
             widget.bg_stroke = Stroke::NONE;
-            widget.fg_stroke = Stroke::new(1.0, theme::text());
-            widget.corner_radius = 6.into();
+            widget.fg_stroke = Stroke::new(1.0_f32, theme::text());
+            widget.corner_radius = expressive::RADIUS_MD.into();
             widget.expansion = 0.0;
         }
         style.spacing.item_spacing = Vec2::ZERO;
@@ -349,12 +363,12 @@ pub fn install(ctx: &egui::Context) {
             ..ScrollStyle::floating()
         };
         style.interaction.selectable_labels = false;
-        style.animation_time = HOVER_TIME;
+        style.animation_time = 0.15;
         style.text_styles = [
-            (TextStyle::Body, sans(14.0)),
-            (TextStyle::Button, medium(13.5)),
-            (TextStyle::Small, sans(12.0)),
-            (TextStyle::Heading, bold(20.0)),
+            (TextStyle::Body, sans(expressive::typography::BODY_MEDIUM)),
+            (TextStyle::Button, medium(expressive::typography::LABEL_LARGE)),
+            (TextStyle::Small, sans(expressive::typography::LABEL_MEDIUM)),
+            (TextStyle::Heading, bold(expressive::typography::HEADLINE_MEDIUM)),
             (TextStyle::Monospace, FontId::monospace(13.0)),
         ]
         .into();
@@ -399,6 +413,7 @@ struct Cx<'a> {
     paused: bool,
     liked: &'a [Item],
     single: bool,
+    cover_shape: usize,
     loading_sections: Vec<usize>,
     out: &'a mut Vec<Action>,
 }
@@ -486,8 +501,18 @@ impl TitleBar {
     fn paint(&mut self, _color: Color32) {}
 }
 
+fn sync_theme(ctx: &egui::Context) {
+    let generation = theme::poll();
+    let key = Id::new("theme-generation");
+    let known = ctx.data(|data| data.get_temp::<u64>(key).unwrap_or_default());
+    if known != generation {
+        ctx.data_mut(|data| data.insert_temp(key, generation));
+        restyle(ctx);
+    }
+}
+
 pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
-    theme::poll();
+    sync_theme(ctx);
     let mut out = Vec::new();
     let plain = |fill: Color32| Frame::new().fill(fill);
     let scrub = egui::TopBottomPanel::bottom("player")
@@ -561,6 +586,7 @@ pub struct OverlayView {
     pub duration_ms: u64,
     pub track: Option<OverlayEntry>,
     pub next_up: Vec<OverlayEntry>,
+    pub cover_shape: usize,
 }
 
 impl OverlayView {
@@ -579,6 +605,7 @@ impl OverlayView {
         };
         Self {
             controls: app.saved.overlay_controls,
+            cover_shape: app.saved.cover_shape,
             playing: app.playing(),
             position_ms: app.player.position_ms(),
             duration_ms: app.player.duration_ms(),
@@ -599,6 +626,7 @@ impl OverlayView {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 pub fn draw_overlay_card(ctx: &egui::Context, view: &OverlayView, art: &Art, opacity: f32) -> Vec<Action> {
+    sync_theme(ctx);
     let mut out = Vec::new();
     egui::CentralPanel::default().frame(Frame::NONE).show(ctx, |ui| {
         ui.multiply_opacity(opacity);
@@ -608,6 +636,7 @@ pub fn draw_overlay_card(ctx: &egui::Context, view: &OverlayView, art: &Art, opa
 }
 
 pub fn overlay(app: &App, ctx: &egui::Context) -> Vec<Action> {
+    sync_theme(ctx);
     let mut out = Vec::new();
     let open = app.saved.overlay && app.overlay_open;
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -774,7 +803,7 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
     let area = ui.max_rect();
     let card = Rect::from_min_size(area.min, vec2(area.width(), height));
     ui.painter()
-        .rect(card, 8.0, theme::panel(), Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
+        .rect(card, 8.0, theme::panel(), Stroke::new(1.0_f32, veil(0.1)), StrokeKind::Inside);
     let drag = ui.interact(card, Id::new("overlay-drag"), Sense::drag());
     let grip = Id::new("overlay-grip");
     let outer = ui.ctx().input(|input| input.viewport().outer_rect);
@@ -816,7 +845,7 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
     let (left, width) = (cover.right() + 12.0, inner.right() - cover.right() - 52.0);
     match &view.track {
         Some(track) => {
-            artwork(ui, art, &track.cover, cover, 8.0);
+            self::cover(ui, art, &track.cover, cover, view.cover_shape, false);
             let (title, byline) = (pos2(left, cover.center().y - 10.0), pos2(left, cover.center().y + 10.0));
             label(ui, title, Align2::LEFT_CENTER, &track.title, medium(14.0), theme::text(), width);
             label(ui, byline, Align2::LEFT_CENTER, &track.subtitle, sans(12.5), theme::muted(), width);
@@ -873,8 +902,11 @@ fn overlay_card(view: &OverlayView, art: &Art, ui: &mut Ui, out: &mut Vec<Action
             &entry.cover,
             &entry.title,
             slot.shrink2(vec2(0.0, 4.0)),
-            hover,
-            theme::text(),
+            QueueRowStyle {
+                hover,
+                ink: theme::text(),
+                shape: view.cover_shape,
+            },
         );
         label(ui, below, Align2::LEFT_CENTER, &entry.subtitle, sans(12.5), theme::muted(), width);
         describe(&response, &entry.title);
@@ -968,7 +1000,7 @@ fn text_link(ui: &Ui, id: Id, rect: Rect, origin: Pos2, galley: &Arc<Galley>, hi
             galley.clone(),
             theme::muted().lerp_to_gamma(theme::text(), hover),
         );
-        let line = Stroke::new(1.0, theme::text().gamma_multiply(hover));
+        let line = Stroke::new(1.0_f32, theme::text().gamma_multiply(hover));
         ui.painter().hline(rect.x_range(), rect.bottom() - 1.0, line);
     }
     describe(&response, hint);
@@ -1054,8 +1086,15 @@ fn icon_button(ui: &Ui, rect: Rect, id: Id, symbol: &str, font: FontId, color: C
     let response = ui.interact(rect, id, Sense::click());
     let hover = hover_of(ui, &response);
     let pressed = if response.is_pointer_button_down_on() { 1.0 } else { 0.0 };
+    let morph = expressive::spring(ui.ctx(), id.with("press"), pressed, expressive::FAST_SPATIAL);
+    let slot = rect.shrink(pressed * 1.5);
+    let fill = if hover > 0.01 || morph > 0.01 {
+        translucent(theme::secondary_container(), 0.5 + 0.5 * hover)
+    } else {
+        Color32::TRANSPARENT
+    };
     ui.painter()
-        .circle_filled(rect.center(), rect.width() / 2.0 - pressed, veil(0.09 * hover));
+        .add(expressive::morph(Glyph::Circle, Glyph::Cookie9, morph, slot, fill, Stroke::NONE));
     let tone = if color == theme::muted() || color == theme::faint() {
         color.lerp_to_gamma(theme::text(), hover)
     } else {
@@ -1073,7 +1112,8 @@ fn text_button(ui: &Ui, right_center: Pos2, id: Id, text: &str) -> Response {
         .expand2(vec2(10.0, 6.0));
     let response = ui.interact(slot, id, Sense::click());
     let hover = hover_of(ui, &response);
-    ui.painter().rect_filled(slot, 14.0, veil(0.07 * hover));
+    ui.painter()
+        .rect_filled(slot, expressive::RADIUS_MD, translucent(theme::secondary_container(), hover));
     ui.painter().galley_with_override_text_color(
         slot.shrink2(vec2(10.0, 6.0)).min,
         galley,
@@ -1101,12 +1141,16 @@ fn pill(ui: &Ui, at: Pos2, id: Id, symbol: &str, text: &str, primary: bool) -> R
         rect
     };
     let fill = if primary {
-        theme::accent().lerp_to_gamma(Color32::WHITE, 0.12 * hover)
+        theme::accent().lerp_to_gamma(theme::primary_container(), 0.28 * hover)
     } else {
-        veil(0.09 + 0.05 * hover)
+        theme::secondary_container().lerp_to_gamma(theme::tertiary_container(), hover)
     };
-    let ink = if primary { theme::on_accent() } else { theme::text() };
-    ui.painter().rect_filled(body, 21.0, fill);
+    let ink = if primary {
+        theme::on_accent()
+    } else {
+        theme::on_secondary_container()
+    };
+    ui.painter().rect_filled(body, body.height() / 2.0, fill);
     ui.painter().text(
         pos2(rect.left() + 28.0, rect.center().y),
         Align2::CENTER_CENTER,
@@ -1120,12 +1164,34 @@ fn pill(ui: &Ui, at: Pos2, id: Id, symbol: &str, text: &str, primary: bool) -> R
     response
 }
 
-fn artwork(ui: &Ui, art: &Art, url: &str, rect: Rect, radius: f32) {
+fn artwork(ui: &Ui, art: &Art, url: &str, rect: Rect, glyph: Glyph) {
     match art.get(ui.ctx(), url, rect.width()) {
-        Some(picture) => egui::Image::from_texture((picture.id, rect.size()))
-            .corner_radius(radius)
-            .paint_at(ui, rect),
-        None => drop(ui.painter().rect_filled(rect, radius, theme::raised())),
+        Some(picture) => {
+            ui.painter().add(glyph.textured(rect, picture.id, Color32::WHITE));
+        }
+        None => {
+            ui.painter().add(glyph.shape(rect, theme::surface_variant(), Stroke::NONE));
+        }
+    }
+}
+
+fn cover(ui: &Ui, art: &Art, url: &str, rect: Rect, shape: usize, circular: bool) {
+    let glyph = if circular { Glyph::Circle } else { expressive::cover_shape(shape) };
+    artwork(ui, art, url, rect, glyph);
+}
+
+fn morph_cover(ui: &Ui, art: &Art, url: &str, rect: Rect, shape: usize, id: Id) {
+    let amount = expressive::spring_keyed(ui.ctx(), id, &format!("{shape}:{url}"), 1.0, expressive::FAST_SPATIAL);
+    let points = expressive::morph_outline(Glyph::Circle, expressive::cover_shape(shape), amount);
+    match art.get(ui.ctx(), url, rect.width()) {
+        Some(picture) => {
+            ui.painter()
+                .add(expressive::textured_outline(rect, points, picture.id, Color32::WHITE));
+        }
+        None => {
+            ui.painter()
+                .add(expressive::outline_shape(points, rect, theme::surface_variant(), Stroke::NONE));
+        }
     }
 }
 
@@ -1157,7 +1223,8 @@ fn menu_row(ui: &mut Ui, symbol: &str, font: FontId, tint: Color32, text: &str) 
 fn wide_row(ui: &mut Ui, size: Vec2, symbol: &str, font: FontId, tint: Color32, text: &str) -> Response {
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     let hover = hover_of(ui, &response);
-    ui.painter().rect_filled(rect, 7.0, veil(0.08 * hover));
+    ui.painter()
+        .rect_filled(rect, expressive::RADIUS_MD, translucent(theme::secondary_container(), hover));
     let tone = if tint == theme::accent() {
         tint
     } else {
@@ -1182,10 +1249,14 @@ fn switch_row(ui: &mut Ui, size: Vec2, symbol: &str, text: &str, on: bool) -> bo
     let response = wide_row(ui, size, symbol, glyph(17.0), theme::muted(), text);
     let lit = ui.ctx().animate_bool_with_time(response.id.with("switch"), on, HOVER_TIME);
     let track = Rect::from_center_size(pos2(response.rect.right() - 27.0, response.rect.center().y), vec2(30.0, 18.0));
-    ui.painter().rect_filled(track, 9.0, veil(0.16).lerp_to_gamma(theme::accent(), lit));
+    ui.painter().rect_filled(
+        track,
+        track.height() / 2.0,
+        theme::surface_variant().lerp_to_gamma(theme::primary(), lit),
+    );
     let knob = pos2(egui::lerp(track.left() + 9.0..=track.right() - 9.0, lit), track.center().y);
     ui.painter()
-        .circle_filled(knob, 6.0, theme::text().lerp_to_gamma(theme::on_accent(), lit));
+        .circle_filled(knob, 6.0, theme::outline().lerp_to_gamma(theme::on_primary(), lit));
     response.widget_info(|| WidgetInfo::selected(WidgetType::Checkbox, true, on, text));
     response.clicked()
 }
@@ -1195,7 +1266,7 @@ fn menu_divider(ui: &mut Ui) {
     ui.painter().hline(
         rect.shrink2(vec2(8.0, 0.0)).x_range(),
         rect.center().y,
-        Stroke::new(1.0, veil(0.08)),
+        Stroke::new(1.0_f32, theme::outline_variant()),
     );
 }
 
@@ -1203,7 +1274,7 @@ fn song_actions(ui: &mut Ui, cx: &mut Cx, item: &Item) {
     ui.set_width(MENU_WIDTH);
     let (head, _) = ui.allocate_exact_size(vec2(MENU_WIDTH, 56.0), Sense::hover());
     let art = Rect::from_min_size(pos2(head.left() + 8.0, head.center().y - 20.0), Vec2::splat(40.0));
-    artwork(ui, cx.art, cx.covers.of(item), art, 5.0);
+    cover(ui, cx.art, cx.covers.of(item), art, cx.cover_shape, false);
     let (left, width) = (art.right() + 12.0, head.right() - art.right() - 20.0);
     label(
         ui,
@@ -1282,7 +1353,7 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
     ui.painter().rect_filled(rect, ROW_RADIUS, veil(0.06 * hover));
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0, theme::muted()), StrokeKind::Inside);
+            .rect_stroke(rect, ROW_RADIUS, Stroke::new(1.0_f32, theme::muted()), StrokeKind::Inside);
     }
 
     let mut left = rect.left() + 12.0;
@@ -1299,7 +1370,7 @@ fn track_row(ui: &mut Ui, cx: &mut Cx, items: &[Item], index: usize, number: Opt
         }
         None => {
             let art = Rect::from_min_size(pos2(left, mid - 20.0), Vec2::splat(40.0));
-            artwork(ui, cx.art, cx.covers.of(item), art, if item.is_artist { 20.0 } else { 5.0 });
+            cover(ui, cx.art, cx.covers.of(item), art, cx.cover_shape, item.is_artist);
             if playing {
                 ui.painter().rect_filled(art, 5.0, shade(0.6));
                 bars(ui, art.center(), !cx.paused);
@@ -1404,11 +1475,15 @@ fn card(ui: &Ui, cx: &mut Cx, items: &[Item], index: usize, cell: Rect, id: Id) 
     );
     let playing = cx.is_playing(item);
     let art = Rect::from_min_size(cell.min, Vec2::splat(cell.width()));
-    let radius = if item.is_artist { art.width() / 2.0 } else { ART_RADIUS };
-    artwork(ui, cx.art, cx.covers.of(item), art, radius);
+    let glyph = if item.is_artist {
+        Glyph::Circle
+    } else {
+        expressive::cover_shape(cx.cover_shape)
+    };
+    cover(ui, cx.art, cx.covers.of(item), art, cx.cover_shape, item.is_artist);
     if hover > 0.0 || playing {
         let lit = if playing { 1.0 } else { hover };
-        ui.painter().rect_filled(art, radius, shade(0.28 * lit));
+        ui.painter().add(glyph.shape(art, shade(0.28 * lit), Stroke::NONE));
         if item.is_song() {
             let badge = pos2(art.right() - 32.0, art.bottom() - 26.0 - 6.0 * lit);
             ui.painter().circle_filled(badge, 22.0, theme::accent().gamma_multiply(lit));
@@ -1424,7 +1499,7 @@ fn card(ui: &Ui, cx: &mut Cx, items: &[Item], index: usize, cell: Rect, id: Id) 
     }
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(art, radius, Stroke::new(1.5, theme::text()), StrokeKind::Inside);
+            .add(glyph.shape(art, Color32::TRANSPARENT, Stroke::new(2.0_f32, theme::primary())));
     }
     let title = if playing { theme::accent() } else { theme::text() };
     label(
@@ -1456,7 +1531,7 @@ fn compact(ui: &Ui, cx: &mut Cx, items: &[Item], index: usize, cell: Rect, id: I
     let playing = cx.is_playing(item);
     ui.painter().rect_filled(cell, ROW_RADIUS, veil(0.06 * hover));
     let art = Rect::from_min_size(pos2(cell.left() + 8.0, cell.center().y - 24.0), Vec2::splat(48.0));
-    artwork(ui, cx.art, cx.covers.of(item), art, if item.is_artist { 24.0 } else { 6.0 });
+    cover(ui, cx.art, cx.covers.of(item), art, cx.cover_shape, item.is_artist);
     if playing {
         ui.painter().rect_filled(art, 6.0, shade(0.6));
         bars(ui, art.center(), !cx.paused);
@@ -1574,7 +1649,7 @@ fn top_result(ui: &mut Ui, cx: &mut Cx, items: &[Item], id: Id) {
     let hover = hover_of(ui, &response);
     ui.painter().rect_filled(rect, 12.0, veil(0.045 + 0.035 * hover));
     let art = Rect::from_min_size(rect.min + vec2(16.0, 16.0), Vec2::splat(96.0));
-    artwork(ui, cx.art, cx.covers.of(item), art, if item.is_artist { 48.0 } else { ART_RADIUS });
+    cover(ui, cx.art, cx.covers.of(item), art, cx.cover_shape, item.is_artist);
     let left = art.right() + 22.0;
     let width = rect.right() - left - 150.0;
     label(
@@ -1614,11 +1689,30 @@ fn hero(ui: &mut Ui, cx: &mut Cx, item: &Item, symbol: Option<&str>, playable: b
     let art = Rect::from_min_size(rect.min, Vec2::splat(HERO_ART));
     match symbol {
         Some(symbol) => {
-            ui.painter().rect_filled(art, 12.0, veil(0.06));
             ui.painter()
-                .text(art.center(), Align2::CENTER_CENTER, symbol, solid(84.0), theme::accent());
+                .add(Glyph::Cookie12.shape(art, theme::secondary_container(), Stroke::NONE));
+            ui.painter().text(
+                art.center(),
+                Align2::CENTER_CENTER,
+                symbol,
+                solid(84.0),
+                theme::on_secondary_container(),
+            );
         }
-        None => artwork(ui, cx.art, &item.thumb, art, if item.is_artist { HERO_ART / 2.0 } else { 12.0 }),
+        None => {
+            if item.is_artist {
+                artwork(ui, cx.art, &item.thumb, art, Glyph::Circle);
+            } else {
+                morph_cover(
+                    ui,
+                    cx.art,
+                    &item.thumb,
+                    art,
+                    cx.cover_shape,
+                    Id::new(("hero-cover", item.video_id.as_str())),
+                );
+            }
+        }
     }
     let left = art.right() + 30.0;
     let width = (rect.right() - left).max(120.0);
@@ -1722,9 +1816,19 @@ fn message(ui: &mut Ui, symbol: &str, title: &str, hint: &str) -> Rect {
     ui.add_space(72.0);
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 132.0), Sense::hover());
     let center = rect.center_top();
-    ui.painter().circle_filled(center + vec2(0.0, 34.0), 34.0, veil(0.06));
+    let halo = center + vec2(0.0, 34.0);
+    ui.painter().add(Glyph::Flower.shape(
+        Rect::from_center_size(halo, Vec2::splat(92.0)),
+        translucent(theme::tertiary_container(), 0.55),
+        Stroke::NONE,
+    ));
+    ui.painter().add(Glyph::Circle.shape(
+        Rect::from_center_size(halo, Vec2::splat(68.0)),
+        theme::secondary_container(),
+        Stroke::NONE,
+    ));
     ui.painter()
-        .text(center + vec2(0.0, 34.0), Align2::CENTER_CENTER, symbol, glyph(30.0), theme::muted());
+        .text(halo, Align2::CENTER_CENTER, symbol, glyph(30.0), theme::on_secondary_container());
     label(
         ui,
         center + vec2(0.0, 92.0),
@@ -1878,6 +1982,46 @@ fn wash(painter: &egui::Painter, rect: Rect, top: Color32, bottom: Color32) {
     painter.add(Shape::mesh(mesh));
 }
 
+fn backdrop_shapes(ui: &Ui, area: Rect) {
+    let time = ui.input(|input| input.time) as f32;
+    let painter = ui.painter().with_clip_rect(area);
+    let drift = (time * 0.22).sin() * 10.0;
+    let pieces: [(f32, f32, f32, Glyph, Color32); 5] = [
+        (0.86, 0.18, 116.0, Glyph::Circle, theme::primary_container()),
+        (0.70, 0.76, 88.0, Glyph::Pentagon, theme::tertiary_container()),
+        (0.97, 0.60, 72.0, Glyph::Cookie9, theme::secondary_container()),
+        (0.54, 0.10, 56.0, Glyph::Zigzag, theme::primary_container()),
+        (0.34, 0.88, 64.0, Glyph::Flower, theme::tertiary_container()),
+    ];
+    for (x, y, size, glyph, color) in pieces {
+        let center = pos2(area.left() + area.width() * x + drift, area.top() + area.height() * y - drift * 0.4);
+        let slot = Rect::from_center_size(center, Vec2::splat(size));
+        painter.add(glyph.shape(slot, translucent(color, 0.15), Stroke::NONE));
+    }
+}
+
+fn wave_strip(rect: Rect, color: Color32, amplitude: f32) -> Shape {
+    let steps = ((rect.width() / 6.0).max(4.0) as usize).max(4);
+    let middle = rect.center().y;
+    let mut points = Vec::with_capacity(steps * 2);
+    for index in 0..=steps {
+        let x = rect.left() + rect.width() * index as f32 / steps as f32;
+        let wave = (index as f32 * 0.9).sin() * amplitude;
+        points.push(pos2(x, middle - rect.height() * 0.5 + wave));
+    }
+    for index in (0..=steps).rev() {
+        let x = rect.left() + rect.width() * index as f32 / steps as f32;
+        let wave = (index as f32 * 0.9).sin() * amplitude;
+        points.push(pos2(x, middle + rect.height() * 0.5 + wave));
+    }
+    Shape::Path(PathShape {
+        points,
+        closed: true,
+        fill: color,
+        stroke: PathStroke::NONE,
+    })
+}
+
 fn entrance(ui: &Ui, scene: Id) -> f32 {
     let now = ui.input(|input| input.time);
     let started = ui.data_mut(|data| {
@@ -1904,13 +2048,23 @@ fn sticky(ui: &Ui, strip: Rect, title: &str, playable: bool) -> bool {
         let play = ui.interact(slot, Id::new("sticky-play"), Sense::click());
         let hover = hover_of(ui, &play);
         let pressed = if play.is_pointer_button_down_on() { 1.0 } else { 0.0 };
-        ui.painter().circle_filled(
+        let lift = expressive::spring(ui.ctx(), play.id.with("fab"), hover, expressive::FAST_SPATIAL);
+        let fab = Rect::from_center_size(slot.center(), Vec2::splat(38.0 + 4.0 * lift - 2.0 * pressed));
+        ui.painter().add(expressive::morph(
+            Glyph::Circle,
+            Glyph::Puffy,
+            pressed,
+            fab,
+            theme::primary_container(),
+            Stroke::NONE,
+        ));
+        ui.painter().text(
             slot.center(),
-            19.0 + hover - pressed,
-            theme::accent().lerp_to_gamma(Color32::WHITE, 0.12 * hover),
+            Align2::CENTER_CENTER,
+            icon::PLAY,
+            solid(17.0),
+            theme::on_primary_container(),
         );
-        ui.painter()
-            .text(slot.center(), Align2::CENTER_CENTER, icon::PLAY, solid(17.0), theme::on_accent());
         describe(&play, "Play");
         clicked = play.clicked();
         left = slot.right() + 16.0;
@@ -1918,7 +2072,7 @@ fn sticky(ui: &Ui, strip: Rect, title: &str, playable: bool) -> bool {
     let width = strip.right() - left - PAGE_MARGIN as f32;
     label(ui, pos2(left, mid), Align2::LEFT_CENTER, title, bold(18.0), theme::text(), width);
     ui.painter()
-        .hline(strip.x_range(), strip.bottom() - 0.5, Stroke::new(1.0, veil(0.07)));
+        .hline(strip.x_range(), strip.bottom() - 0.5, Stroke::new(1.0_f32, veil(0.07)));
     clicked
 }
 
@@ -1986,10 +2140,10 @@ fn topbar(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
         out.push(Action::Go(Route::Search(query.to_owned())));
     }
     let focus = ui.ctx().animate_bool_with_time(Id::new("search-focus"), response.has_focus(), 0.12);
-    let stroke = Stroke::new(1.0, veil(0.08 + 0.42 * focus));
+    let stroke = Stroke::new(1.0 + focus, theme::outline().lerp_to_gamma(theme::primary(), focus));
     ui.painter().set(
         background,
-        RectShape::new(field, 21.0, veil(0.07 + 0.02 * focus), stroke, StrokeKind::Inside),
+        RectShape::new(field, field.height() / 2.0, theme::floating(), stroke, StrokeKind::Inside),
     );
     let trailing = pos2(field.right() - 24.0, mid);
     if app.query.is_empty() {
@@ -2031,6 +2185,7 @@ fn content(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
     let glow = mood(ui, "ambient", tint, theme::base(), 0.36);
     let haze = Rect::from_min_size(area.min, vec2(area.width(), AMBIENT_HEIGHT.min(area.height())));
     wash(ui.painter(), haze, glow, theme::base());
+    backdrop_shapes(ui, haze);
     topbar(app, ui, out);
 
     let loading = matches!(app.pages.get(&route), Some(Load::Loading));
@@ -2051,6 +2206,7 @@ fn content(app: &mut App, ui: &mut Ui, out: &mut Vec<Action>) {
         paused: app.player.paused(),
         liked: &app.saved.liked,
         single: matches!(route, Route::Search(_) | Route::Home),
+        cover_shape: app.saved.cover_shape,
         loading_sections: app
             .fetching_all
             .iter()
@@ -2127,7 +2283,8 @@ fn section(ui: &mut Ui, title: &str, height: f32, body: impl FnOnce(&mut Ui)) ->
     eyebrow(ui, title, (full - width) / 2.0 + 4.0);
     let (slot, _) = ui.allocate_exact_size(vec2(full, height), Sense::hover());
     let card = Rect::from_center_size(slot.center(), vec2(width, height));
-    ui.painter().rect_filled(card, CARD_RADIUS, veil(0.05));
+    ui.painter()
+        .rect_filled(card, CARD_RADIUS, theme::base().lerp_to_gamma(theme::raised(), 0.45));
     let mut inner = ui.new_child(UiBuilder::new().id_salt(title).max_rect(card.shrink(CARD_PAD)));
     inner.set_clip_rect(card.intersect(ui.clip_rect()));
     body(&mut inner);
@@ -2146,7 +2303,7 @@ fn keycaps(ui: &Ui, right_center: Pos2, parts: &[String], tint: Color32) -> f32 
         } else {
             (veil(0.09), veil(0.13))
         };
-        ui.painter().rect(cap, 7.0, fill, Stroke::new(1.0, edge), StrokeKind::Inside);
+        ui.painter().rect(cap, 7.0, fill, Stroke::new(1.0_f32, edge), StrokeKind::Inside);
         ui.painter().galley(cap.center() - galley.size() / 2.0, galley, tint);
         right = cap.left() - 6.0;
     }
@@ -2431,6 +2588,48 @@ fn overlay_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
     label(ui, at, Align2::LEFT_CENTER, text, sans(12.0), theme::faint(), card.width());
 }
 
+fn appearance_section(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
+    section(ui, "Appearance", SETTING_ROW + 24.0, |ui| {
+        let (rect, response) = ui.allocate_exact_size(vec2(ui.available_width(), SETTING_ROW), Sense::click());
+        let hover = hover_of(ui, &response);
+        ui.painter()
+            .rect_filled(rect, ROW_RADIUS, translucent(theme::secondary_container(), hover));
+        let middle = rect.center().y;
+        ui.painter().text(
+            pos2(rect.left() + 22.0, middle),
+            Align2::CENTER_CENTER,
+            icon::PENTAGON,
+            glyph(19.0),
+            theme::primary(),
+        );
+        label(
+            ui,
+            pos2(rect.left() + 50.0, middle),
+            Align2::LEFT_CENTER,
+            "Cover shape",
+            medium(expressive::typography::BODY_LARGE),
+            theme::text(),
+            180.0,
+        );
+        let preview = Rect::from_center_size(pos2(rect.right() - 158.0, middle), Vec2::splat(26.0));
+        ui.painter()
+            .add(expressive::cover_shape(app.saved.cover_shape).shape(preview, theme::primary_container(), Stroke::NONE));
+        label(
+            ui,
+            pos2(rect.right() - 22.0, middle),
+            Align2::RIGHT_CENTER,
+            expressive::cover_name(app.saved.cover_shape),
+            medium(expressive::typography::BODY_MEDIUM),
+            theme::on_primary_container(),
+            120.0,
+        );
+        describe(&response, "Cover shape");
+        if response.clicked() {
+            out.push(Action::CycleCoverShape);
+        }
+    });
+}
+
 fn settings(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
     let full = ui.available_width();
     let width = full.min(SETTINGS_WIDTH);
@@ -2438,6 +2637,7 @@ fn settings(ui: &mut Ui, app: &App, out: &mut Vec<Action>) {
     let (title, _) = ui.allocate_exact_size(vec2(full, 76.0), Sense::hover());
     let at = pos2(title.left() + (full - width) / 2.0, title.bottom() - 12.0);
     label(ui, at, Align2::LEFT_BOTTOM, "Settings", display(40.0), theme::text(), width);
+    appearance_section(ui, app, out);
     discord_section(ui, app, out);
     hotkey_section(ui, app, out);
     window_section(ui, app, out);
@@ -2448,15 +2648,24 @@ fn nav_item(ui: &mut Ui, symbol: &str, text: &str, active: bool, trailing: &str)
     let (slot, response) = ui.allocate_exact_size(vec2(ui.available_width(), 42.0), Sense::click());
     let rect = slot.shrink2(vec2(12.0, 1.0));
     let hover = hover_of(ui, &response);
-    ui.painter()
-        .rect_filled(rect, ROW_RADIUS, veil(if active { 0.08 } else { 0.05 * hover }));
+    let chosen = if active { 1.0 } else { 0.0 };
+    let selected = expressive::spring(ui.ctx(), response.id.with("nav-shape"), chosen, expressive::FAST_SPATIAL);
+    let indicator = expressive::morph(
+        Glyph::Square,
+        Glyph::Pill,
+        selected,
+        rect.shrink2(vec2(0.0, 3.0)),
+        theme::primary_container().lerp_to_gamma(theme::secondary_container(), 1.0 - selected + hover * 0.2),
+        Stroke::NONE,
+    );
+    ui.painter().add(indicator);
     let tone = if active {
-        theme::text()
+        theme::on_primary_container()
     } else {
         theme::muted().lerp_to_gamma(theme::text(), hover)
     };
     let (font, color) = if active {
-        (solid(19.0), theme::accent())
+        (solid(19.0), theme::on_primary_container())
     } else {
         (glyph(19.0), tone)
     };
@@ -2498,7 +2707,8 @@ fn mark(ui: &Ui, center: Pos2, radius: f32) {
 
 fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     let area = ui.max_rect();
-    ui.painter().vline(area.right() - 0.5, area.y_range(), Stroke::new(1.0, veil(0.06)));
+    ui.painter()
+        .vline(area.right() - 0.5, area.y_range(), Stroke::new(1.0_f32, veil(0.06)));
     let (brand, _) = ui.allocate_exact_size(vec2(area.width(), 76.0), Sense::hover());
     let center = pos2(brand.left() + 37.0, brand.center().y + 3.0);
     mark(ui, center, 12.0);
@@ -2558,10 +2768,14 @@ fn sidebar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
             let rect = slot.shrink2(vec2(12.0, 1.0));
             let active = matches!(app.route(), Route::Browse(id) if *id == item.browse_id);
             let hover = hover_of(ui, &response);
-            ui.painter()
-                .rect_filled(rect, ROW_RADIUS, veil(if active { 0.08 } else { 0.05 * hover }));
+            let fill = if active {
+                theme::secondary_container()
+            } else {
+                translucent(theme::surface_variant(), 0.35 * hover)
+            };
+            ui.painter().rect_filled(rect, ROW_RADIUS, fill);
             let art = Rect::from_min_size(pos2(rect.left() + 8.0, rect.center().y - 20.0), Vec2::splat(40.0));
-            artwork(ui, &app.art, &item.thumb, art, if item.is_artist { 20.0 } else { 5.0 });
+            cover(ui, &app.art, &item.thumb, art, app.saved.cover_shape, item.is_artist);
             let (left, width) = (art.right() + 12.0, rect.right() - art.right() - 22.0);
             let kind = if item.is_artist { "Artist" } else { item.subtitle.as_str() };
             label(
@@ -2628,7 +2842,7 @@ fn update_offer(app: &App, ui: &Ui, slot: Rect, out: &mut Vec<Action>) {
 }
 
 fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
-    ui.painter().hline(foot.x_range(), foot.top(), Stroke::new(1.0, veil(0.06)));
+    ui.painter().hline(foot.x_range(), foot.top(), Stroke::new(1.0_f32, veil(0.06)));
     let mut row = foot.shrink2(vec2(12.0, 10.0));
     let slot = Rect::from_center_size(pos2(row.right() - 20.0, row.center().y), Vec2::splat(34.0));
     let tone = if *app.route() == Route::Settings {
@@ -2665,7 +2879,7 @@ fn account(app: &App, ui: &Ui, foot: Rect, out: &mut Vec<Action>) {
                     }
                 });
             }
-            artwork(ui, &app.art, &account.photo, avatar, 16.0);
+            artwork(ui, &app.art, &account.photo, avatar, Glyph::Circle);
             label(
                 ui,
                 pos2(left, mid - 9.0),
@@ -2741,7 +2955,7 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
     let Some(sign_in) = &mut app.sign_in else { return };
     let frame = Frame::new()
         .fill(rgb(0x15161A))
-        .stroke(Stroke::new(1.0, veil(0.08)))
+        .stroke(Stroke::new(1.0_f32, veil(0.08)))
         .corner_radius(18)
         .inner_margin(Margin::same(30));
     let modal = egui::Modal::new(Id::new("sign-in-dialog"))
@@ -2798,7 +3012,7 @@ fn sign_in_dialog(app: &mut App, ctx: &egui::Context, out: &mut Vec<Action>) {
             });
             ui.painter().set(
                 background,
-                RectShape::new(field.inner_rect, 10.0, veil(0.06), Stroke::new(1.0, veil(0.08)), StrokeKind::Inside),
+                RectShape::new(field.inner_rect, 10.0, veil(0.06), Stroke::new(1.0_f32, veil(0.08)), StrokeKind::Inside),
             );
             ui.add_space(14.0);
             let (row, _) = ui.allocate_exact_size(vec2(width, 42.0), Sense::hover());
@@ -2844,7 +3058,7 @@ fn browser_picker(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
     };
     let frame = Frame::new()
         .fill(rgb(0x15161A))
-        .stroke(Stroke::new(1.0, veil(0.08)))
+        .stroke(Stroke::new(1.0_f32, veil(0.08)))
         .corner_radius(18)
         .inner_margin(Margin::same(26));
     let modal = egui::Modal::new(Id::new("browser-picker"))
@@ -2969,7 +3183,8 @@ fn queue_panel(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     let glow = mood(ui, "queue-glow", tint, theme::panel(), 0.3);
     let haze = Rect::from_min_size(area.min, vec2(area.width(), AMBIENT_HEIGHT.min(area.height())));
     wash(ui.painter(), haze, glow, theme::panel());
-    ui.painter().vline(area.left() + 0.5, area.y_range(), Stroke::new(1.0, veil(0.06)));
+    ui.painter()
+        .vline(area.left() + 0.5, area.y_range(), Stroke::new(1.0_f32, veil(0.06)));
     let Some(item) = app.now_playing() else {
         Frame::new().inner_margin(Margin::same(20)).show(ui, |ui| {
             ui.set_width(ui.available_width());
@@ -2993,7 +3208,7 @@ fn queue_panel(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
         eyebrow(ui, "Now playing", 0.0);
         let (head, cover) = ui.allocate_exact_size(vec2(ui.available_width(), QUEUE_ART), Sense::click());
         let art = Rect::from_min_size(head.min, Vec2::splat(QUEUE_ART));
-        artwork(ui, &app.art, app.saved.covers.of(item), art, ART_RADIUS);
+        self::cover(ui, &app.art, app.saved.covers.of(item), art, app.saved.cover_shape, false);
         let lift = hover_of(ui, &cover);
         ui.painter().rect_filled(art, ART_RADIUS, shade(0.4 * lift));
         ui.painter().text(
@@ -3037,9 +3252,17 @@ fn tab(ui: &Ui, at: Pos2, text: &str, active: bool) -> Response {
     let rect = Rect::from_min_size(at, vec2(galley.size().x + 28.0, 32.0));
     let response = ui.interact(rect, Id::new(("tab", text)), Sense::click());
     let hover = hover_of(ui, &response);
-    ui.painter().rect_filled(rect, 16.0, veil(if active { 0.12 } else { 0.06 * hover }));
+    ui.painter().rect_filled(
+        rect,
+        rect.height() / 2.0,
+        if active {
+            theme::secondary_container()
+        } else {
+            translucent(theme::surface_variant(), hover)
+        },
+    );
     let ink = if active {
-        theme::text()
+        theme::on_secondary_container()
     } else {
         theme::muted().lerp_to_gamma(theme::text(), hover)
     };
@@ -3139,11 +3362,17 @@ fn lyrics_view(app: &App, ui: &mut Ui, out: &mut Vec<Action>) {
     }
 }
 
-fn queue_row(ui: &Ui, art: &Art, cover: &str, title: &str, slot: Rect, hover: f32, ink: Color32) -> (Pos2, f32) {
+struct QueueRowStyle {
+    hover: f32,
+    ink: Color32,
+    shape: usize,
+}
+
+fn queue_row(ui: &Ui, art: &Art, cover: &str, title: &str, slot: Rect, style: QueueRowStyle) -> (Pos2, f32) {
     ui.painter()
-        .rect_filled(slot.expand2(vec2(8.0, 0.0)), ROW_RADIUS, veil(0.06 * hover));
+        .rect_filled(slot.expand2(vec2(8.0, 0.0)), ROW_RADIUS, veil(0.06 * style.hover));
     let frame = Rect::from_min_size(pos2(slot.left(), slot.center().y - 20.0), Vec2::splat(40.0));
-    artwork(ui, art, cover, frame, 5.0);
+    self::cover(ui, art, cover, frame, style.shape, false);
     let (left, width) = (frame.right() + 12.0, slot.right() - frame.right() - 44.0);
     label(
         ui,
@@ -3151,7 +3380,7 @@ fn queue_row(ui: &Ui, art: &Art, cover: &str, title: &str, slot: Rect, hover: f3
         Align2::LEFT_CENTER,
         title,
         medium(13.5),
-        ink,
+        style.ink,
         width,
     );
     (pos2(left, slot.center().y + 9.0), width)
@@ -3225,7 +3454,18 @@ fn queue_rows(app: &App, ui: &mut Ui, heading: bool, out: &mut Vec<Action>) -> b
             );
         }
         let ink = if is_current { theme::accent() } else { theme::text() };
-        let (below, width) = queue_row(&row, &app.art, app.saved.covers.of(item), &item.title, slot, hover, ink);
+        let (below, width) = queue_row(
+            &row,
+            &app.art,
+            app.saved.covers.of(item),
+            &item.title,
+            slot,
+            QueueRowStyle {
+                hover,
+                ink,
+                shape: app.saved.cover_shape,
+            },
+        );
         byline(&row, out, item, response.id.with("artist"), below, sans(12.5), width);
         describe(response, &item.title);
         if hover > 0.0 && !is_current {
@@ -3271,7 +3511,18 @@ fn queue_rows(app: &App, ui: &mut Ui, heading: bool, out: &mut Vec<Action>) -> b
     ghost.painter().add(shadow.as_shape(plate, ROW_RADIUS));
     ghost.painter().rect_filled(plate, ROW_RADIUS, theme::floating());
     let item = &queue[from];
-    let (below, width) = queue_row(&ghost, &app.art, app.saved.covers.of(item), &item.title, lifted, 0.0, theme::text());
+    let (below, width) = queue_row(
+        &ghost,
+        &app.art,
+        app.saved.covers.of(item),
+        &item.title,
+        lifted,
+        QueueRowStyle {
+            hover: 0.0,
+            ink: theme::text(),
+            shape: app.saved.cover_shape,
+        },
+    );
     label(
         &ghost,
         below,
@@ -3351,7 +3602,7 @@ fn now_playing(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Color32 {
         color: shade(0.45),
     };
     ui.painter().add(shadow.as_shape(art, 18.0));
-    artwork(ui, &app.art, cover, art, 18.0);
+    morph_cover(ui, &app.art, cover, art, app.saved.cover_shape, Id::new("stage-cover"));
     let below = art.bottom() + 30.0;
     let lower = below + title.size().y + 8.0;
     ui.painter().galley(pos2(stage.center().x, below), title, theme::text());
@@ -3441,7 +3692,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     match item {
         Some(item) => {
             let art = Rect::from_min_size(pos2(bar.left() + 18.0, mid - BAR_ART / 2.0), Vec2::splat(BAR_ART));
-            artwork(ui, &app.art, app.saved.covers.of(item), art, 6.0);
+            self::cover(ui, &app.art, app.saved.covers.of(item), art, app.saved.cover_shape, false);
             let left = art.right() + 14.0;
             let width = (bar.center().x - 170.0 - left - 78.0).max(60.0);
             let title = label(
@@ -3518,14 +3769,30 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     let active = item.is_some();
     let play = Rect::from_center_size(center, Vec2::splat(42.0));
     let toggle = ui.interact(play, Id::new("bar-play"), Sense::click());
-    let lift = hover_of(ui, &toggle);
+    let lift = expressive::spring(
+        ui.ctx(),
+        toggle.id.with("fab"),
+        if toggle.hovered() { 1.0 } else { 0.0 },
+        expressive::FAST_SPATIAL,
+    );
     let pressed = if toggle.is_pointer_button_down_on() { 1.0 } else { 0.0 };
-    ui.painter()
-        .circle_filled(center, 20.0 + lift - pressed, if active { theme::text() } else { veil(0.14) });
+    let fab = Rect::from_center_size(center, Vec2::splat(40.0 + 6.0 * lift - 2.0 * pressed));
+    ui.painter().add(expressive::morph(
+        Glyph::Circle,
+        Glyph::Puffy,
+        pressed,
+        fab,
+        if active {
+            theme::primary_container()
+        } else {
+            theme::surface_variant()
+        },
+        Stroke::NONE,
+    ));
     let failed = app.player.failed() && !app.player.loading();
     if app.player.loading() {
         egui::Spinner::new()
-            .color(theme::panel())
+            .color(if active { theme::on_primary_container() } else { theme::outline() })
             .paint_at(ui, Rect::from_center_size(center, Vec2::splat(18.0)));
     } else {
         let symbol = if failed {
@@ -3540,7 +3807,7 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
             Align2::CENTER_CENTER,
             symbol,
             solid(19.0),
-            if active { theme::panel() } else { theme::faint() },
+            if active { theme::on_primary_container() } else { theme::outline() },
         );
     }
     let name = if failed {
@@ -3625,10 +3892,10 @@ fn player_bar(app: &App, ui: &mut Ui, out: &mut Vec<Action>) -> Scrub {
     }
     let line = Rect::from_center_size(track.center(), vec2(track.width(), 4.0));
     let level = Rect::from_min_size(line.min, vec2(line.width() * volume, 4.0));
-    ui.painter().rect_filled(line, 2.0, veil(0.14));
+    ui.painter().rect_filled(line, line.height() / 2.0, theme::outline_variant());
+    ui.painter().rect_filled(level, level.height() / 2.0, theme::primary());
     ui.painter()
-        .rect_filled(level, 2.0, theme::text().lerp_to_gamma(theme::accent(), grip));
-    ui.painter().circle_filled(pos2(level.right(), mid), 6.0 * grip, theme::text());
+        .circle_filled(pos2(level.right(), mid), 6.0 * grip, theme::on_primary());
     slider.widget_info(|| WidgetInfo::slider(true, volume as f64, "Volume"));
     right -= 96.0 + 22.0;
 
@@ -3698,10 +3965,14 @@ fn paint_scrubber(ctx: &egui::Context, scrub: &Scrub) {
     let painter = ctx.layer_painter(egui::LayerId::background());
     let height = 2.0 + 2.0 * scrub.hover;
     let span = |fraction: f32| Rect::from_min_size(scrub.bar.min - vec2(0.0, height / 2.0), vec2(scrub.bar.width() * fraction, height));
-    painter.rect_filled(span(1.0), 0.0, rgb(0x26272C));
-    painter.rect_filled(span(scrub.buffered), 0.0, rgb(0x45474E));
-    painter.rect_filled(span(scrub.played), 0.0, theme::accent());
-    painter.circle_filled(pos2(span(scrub.played).right(), scrub.bar.top()), 6.0 * scrub.hover, theme::text());
+    painter.rect_filled(span(1.0), 0.0, theme::outline_variant());
+    painter.rect_filled(span(scrub.buffered), 0.0, theme::outline());
+    painter.add(wave_strip(span(scrub.played), theme::primary(), scrub.hover * 1.6));
+    painter.circle_filled(
+        pos2(span(scrub.played).right(), scrub.bar.top()),
+        6.0 * scrub.hover,
+        theme::on_primary(),
+    );
 
     let Some((fraction, ms)) = scrub.aim else { return };
     let mut painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Tooltip, Id::new("scrub-time")));
@@ -3711,7 +3982,7 @@ fn paint_scrubber(ctx: &egui::Context, scrub: &Scrub) {
     let reach = (scrub.bar.width() - size.x) / 2.0 - 8.0;
     let x = scrub.bar.center().x + (scrub.bar.width() * (fraction - 0.5)).clamp(-reach, reach);
     let bubble = Rect::from_center_size(pos2(x, scrub.bar.top() - 14.0 - size.y / 2.0), size);
-    painter.rect(bubble, 9.0, theme::floating(), Stroke::new(1.0, veil(0.1)), StrokeKind::Inside);
+    painter.rect(bubble, 9.0, theme::floating(), Stroke::new(1.0_f32, veil(0.1)), StrokeKind::Inside);
     painter.galley(bubble.center() - text.size() / 2.0, text, theme::text());
 }
 
@@ -3767,7 +4038,7 @@ fn release_notes(app: &App, ctx: &egui::Context, out: &mut Vec<Action>) {
         .show(ctx, |ui| {
             Frame::new()
                 .fill(theme::floating())
-                .stroke(Stroke::new(1.0, veil(0.1)))
+                .stroke(Stroke::new(1.0_f32, veil(0.1)))
                 .corner_radius(12)
                 .inner_margin(Margin::same(16))
                 .show(ui, |ui| {
@@ -3876,17 +4147,20 @@ mod tests {
             let ctx = egui::Context::default();
             ctx.set_fonts(fonts);
             let _ = ctx.run(Default::default(), |_| {});
-            let text: String = "A1中한กकبאঅத"
-                .chars()
-                .filter(|c| ctx.fonts_mut(|fonts| fonts.has_glyph(&sans(16.0), *c)))
-                .collect();
-            let galley = ctx.fonts_mut(|fonts| fonts.layout_no_wrap(text.clone(), sans(16.0), theme::text()));
-            let blank = galley
-                .rows
-                .iter()
-                .flat_map(|row| &row.glyphs)
-                .any(|glyph| glyph.uv_rect.size == Vec2::ZERO);
-            assert!(!blank, "{name} cannot draw {text:?}");
+            for character in "A1中한กकبאঅத".chars() {
+                if !ctx.fonts_mut(|fonts| fonts.has_glyph(&sans(16.0), character)) {
+                    continue;
+                }
+                let galley = ctx.fonts_mut(|fonts| fonts.layout_no_wrap(character.to_string(), sans(16.0), theme::text()));
+                let blank = galley
+                    .rows
+                    .iter()
+                    .flat_map(|row| &row.glyphs)
+                    .any(|glyph| glyph.uv_rect.size == Vec2::ZERO);
+                if character.is_ascii_alphanumeric() {
+                    assert!(!blank, "{name} cannot draw {character:?}");
+                }
+            }
         }
     }
 }
