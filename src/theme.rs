@@ -1,7 +1,8 @@
 use eframe::egui::Color32;
 use serde::Deserialize;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use std::sync::{LazyLock, Mutex, RwLock};
+use std::time::{Duration, Instant, SystemTime};
 
 #[derive(Clone, Copy)]
 pub struct Palette {
@@ -124,6 +125,35 @@ pub fn load() {
 
 pub fn get() -> Palette {
     CURRENT.read().map(|palette| *palette).unwrap_or(Palette::ORIGINAL)
+}
+
+struct PollState {
+    next_check: Instant,
+    last_modified: Option<SystemTime>,
+}
+
+static POLL: LazyLock<Mutex<PollState>> = LazyLock::new(|| {
+    Mutex::new(PollState {
+        next_check: Instant::now(),
+        last_modified: None,
+    })
+});
+
+pub fn poll() {
+    let Ok(mut state) = POLL.lock() else { return };
+    let now = Instant::now();
+    if now < state.next_check {
+        return;
+    }
+    state.next_check = now + Duration::from_secs(1);
+    let Some(file) = path() else { return };
+    let modified = std::fs::metadata(&file).ok().and_then(|meta| meta.modified().ok());
+    if modified == state.last_modified {
+        return;
+    }
+    state.last_modified = modified;
+    drop(state);
+    load();
 }
 
 pub fn base() -> Color32 {

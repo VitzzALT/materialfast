@@ -487,6 +487,7 @@ impl TitleBar {
 }
 
 pub fn draw(app: &mut App, ctx: &egui::Context) -> Vec<Action> {
+    theme::poll();
     let mut out = Vec::new();
     let plain = |fill: Color32| Frame::new().fill(fill);
     let scrub = egui::TopBottomPanel::bottom("player")
