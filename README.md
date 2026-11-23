@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="Tubefast logo" width="88" height="88">
+  <img src="assets/logo.svg" alt="Materialfast logo" width="88" height="88">
 </p>
 
-<h1 align="center">Tubefast</h1>
+<h1 align="center">Materialfast</h1>
 
-<p align="center"><strong>YouTube Music, native and fast.</strong><br>A lightweight desktop player for Windows, macOS and Linux with no browser engine inside.</p>
+<p align="center"><strong>YouTube Music, native and fast.</strong><br>A native desktop player for Windows, macOS and Linux, built with Rust and egui. No browser engine inside.</p>
 
 <p align="center">
   <a href="https://github.com/yigitbozyaka/tubefast/releases/latest"><strong>Download</strong></a> ·
@@ -19,44 +19,30 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/yigitbozyaka/tubefast" alt="MIT license"></a>
 </p>
 
-![Tubefast playing a track, with the home feed in the middle and the queue on the right](docs/home.png)
+![Materialfast playing a track, with the home feed in the middle and the queue on the right](docs/home.png)
 
-| Idle, 60 seconds after launch | Tubefast | YouTube Music in a Chrome tab |
-|---|---|---|
-| Memory, proportional (PSS) | **89 MB** | 357 MB |
-| Memory, resident (RSS) | **151 MB** | 1018 MB |
-| Processes | 1 | 10 |
-| Size on disk | **8.0 MB** AppImage, 10.2 MB Windows exe | 453 MB Chrome install |
+Materialfast is a native YouTube Music desktop player built with Rust and [egui](https://github.com/emilk/egui). It uses [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) and glow to draw its own interface, talks to YouTube Music directly and decodes audio locally. There is no Chromium or WebView embedded in the app.
 
-Measured on 2026-11-17 in an Ubuntu 24.04 virtual machine (Hyper-V, 4 vCPU, 6 GB, GNOME on Wayland, software rendering), release v0.11.0 against Google Chrome 157 with a fresh profile on music.youtube.com. Nothing was playing and nobody was signed in. Each figure is the median of 3 runs, summed over every process of the app (the Chrome tab includes its renderer, GPU and utility processes). PSS splits shared pages between the processes that use them, RSS counts them in full for each process. Numbers on your machine will differ.
+The app name is Materialfast. The public repository, Rust package, storage ID and compiled executable still use the historical `tubefast` name, so links, commands and download filenames below intentionally keep it.
 
-![Tubefast from cold start to synced lyrics: the home feed, a search, a song playing, and the lyrics following it](docs/demo.gif)
-
-Tubefast is a YouTube Music client written in Rust with [egui](https://github.com/emilk/egui). It talks to YouTube directly, decodes the audio itself and draws every pixel natively. There is no Chromium and no WebView underneath, which is why it starts instantly and stays small.
-
-| | Measured |
-|---|---|
-| Window on screen | 0.1 to 0.3 seconds |
-| Memory on Windows | about 100 MB while playing, about 60 MB of it private |
-| CPU while playing | under 1 % |
-| Download | one `.exe`, about 10 MB |
-
-Numbers are from the release build on Windows 11. Memory is the working set a few seconds into playback, and it grows with window size and with how much artwork you have scrolled past. The first launch from a new folder used about 60 MB more on the test machine (NVIDIA driver), once.
+![Materialfast from cold start to synced lyrics: the home feed, a search, a song playing, and the lyrics following it](docs/demo.gif)
 
 ## What you get
 
 | | |
 |---|---|
-| **Search and browse** | Results appear as you type. Artist, album and playlist pages, with back and forward history. On an artist page, **Show all** loads the full list of top songs, albums and singles and EPs. |
-| **A queue that keeps going** | Play an album or a single song. When the queue runs out, a radio based on the last track continues it. Shuffle and repeat included. |
+| **Search and browse** | Results appear as you type. Artist, album and playlist pages, with back and forward history. On an artist page, **Show all** loads the full list of top songs, albums, singles and EPs. |
+| **A queue that keeps going** | Play an album or a single song. When the queue runs out, a radio based on the last track continues it. Shuffle and repeat are included, and **Stop** clears the current song while keeping the queue ready to play again. |
 | **A queue you cannot lose** | Close the app and the queue, the track and the position are still there next time. Replace a queue you built by accident and **Undo** brings it back. Drag a row to reorder what plays next. |
 | **Now playing and lyrics** | Click the cover or the title in the bar for a full-window view of the track. Its lyrics tab follows the song line by line when YouTube Music has timed lyrics, looks for them on [lrclib.net](https://lrclib.net) when it does not, and shows plain text when neither has them. Korean and Russian lyrics can show an approximate romanized line under each line, with a switch in the lyrics panel. |
-| **Updates itself** | When a new version is out, Tubefast tells you and installs it with one click, then restarts with your queue where it was. It works on Windows, for the AppImage and for a binary in a folder you can write to on Linux, and for Tubefast.app in a folder you can write to on macOS. Installs from a package manager or a read-only folder show the download page instead. |
-| **Media keys** | Play, pause, next and previous keys work from any window, and the track shows up in the Windows media overlay in Now Playing on macOS and in the Linux desktop's media controls (MPRIS), with its cover and progress. |
-| **Global hotkeys** | Turn on **Global hotkeys** in Settings and play, pause, skip, change Tubefast's volume and open the media overlay while a game or any other app has focus. Every shortcut can be changed or cleared, and a shortcut another app already holds is marked. They go straight to Tubefast, so other media players do not get in the way. Off until you turn it on. On Linux they work on X11, and on Wayland through the desktop's global shortcuts portal (KDE Plasma has it), where the keys are chosen in the system settings; Settings says so if the portal is missing. |
-| **Media overlay** | With **Global hotkeys** turned on in Settings, press `Ctrl` + `Alt` + `O` (changeable there) to open an always on top overlay with the current song, playback controls and the next songs in the queue. It does not take focus from your game. Opacity, position, playback controls and next up can each be changed or hidden in Settings. It works over windowed and borderless games, not exclusive fullscreen. On Linux it works on X11 and on Wayland desktops that support the layer shell protocol (KDE Plasma, Hyprland and sway do), where the key is chosen in the system settings like the other hotkeys. GNOME does not support it, so Settings says it is not available there. |
-| **Minimize to tray** | Turn on **Minimize to tray on close** under Settings > Window and closing the window sends Tubefast to the tray. Music keeps playing and global hotkeys keep working. Left click the tray icon to bring it back, right click for Show and Quit. On Linux the tray needs a StatusNotifierItem host, which KDE Plasma has built in; GNOME needs the AppIndicator extension. On Wayland the window is minimized instead of hidden, and the tray menu may not be able to bring it back. |
-| **Discord status** | Turn on **Show on Discord** in Settings (the gear at the bottom of the sidebar) and your Discord profile shows the song you are listening to, with its artist, cover and progress. The same section picks what the short status next to your name says: Tubefast, the artist, the song or a text of your own. It is off until you turn it on. |
+| **Material You dynamic theming** | The interface follows a Material You-style palette. When a wallpaper-derived scheme is available, it uses that as the base; while a song is loaded, accents can follow the current cover without losing the wallpaper surfaces. Cover shape is changeable in Settings, and animations respect the system's Reduced Motion setting. |
+| **Audio spectrum visualizer** | The full-screen player shows a 32-band spectrum that reacts to the playing track and fades in and out. Its position is configurable in Settings > Appearance: **Top** or **Bottom** relative to the queue. It calms down with Reduced Motion and does not keep repainting while the window cannot render. |
+| **Updates itself** | When a new version is out, Materialfast tells you and installs it with one click, then restarts with your queue where it was. It works on Windows, for the AppImage and for a writable Linux binary folder, and for the macOS app bundle in a folder you can write to. Installs from a package manager or a read-only folder show the download page instead. |
+| **Media keys** | Play, pause, next and previous keys work from any window, and the track shows up in the Windows media overlay, in Now Playing on macOS and in the Linux desktop's media controls (MPRIS), with its cover and progress. |
+| **Global hotkeys** | Turn on **Global hotkeys** in Settings and play, pause, skip, change Materialfast's volume and open the media overlay while a game or another app has focus. Every shortcut can be changed or cleared, and a shortcut another app already holds is marked. They go straight to Materialfast, so other media players do not get in the way. Off until you turn it on. On Linux they work on X11 and on Wayland through the desktop's global shortcuts portal, where the keys are chosen in system settings; Settings says so if the portal is missing. |
+| **Media overlay** | With **Global hotkeys** turned on in Settings, press `Ctrl` + `Alt` + `O` (changeable there) to open an always-on-top overlay with the current song, playback controls and the next songs in the queue. It does not take focus from your game. Opacity, position, playback controls and next up can each be changed or hidden in Settings. It works over windowed and borderless games, not exclusive fullscreen. On Linux it works on X11 and on Wayland desktops that support the layer shell protocol, such as KDE Plasma, Hyprland and sway. GNOME does not support it, so Settings says it is not available there. |
+| **Minimize to tray** | Turn on **Minimize to tray on close** under Settings > Window and closing the window sends Materialfast to the tray. Music keeps playing and global hotkeys keep working. Left-click the tray icon to bring it back, right-click for Show and Quit. On Linux the tray needs a StatusNotifierItem host, which KDE Plasma has built in; GNOME needs the AppIndicator extension. |
+| **Discord status** | Turn on **Show on Discord** in Settings and your Discord profile shows the song you are listening to, with its artist, cover and progress. The same section picks what the short status next to your name says: Materialfast, the artist, the song or a text of your own. It is off until you turn it on. |
 | **A home feed that knows you** | Signed out, the feed is built from what you played here. Signed in, you get your own YouTube Music feed and playlists. |
 | **Your library, kept locally** | Liked songs, listening history and saved albums, playlists and artists live on your computer. |
 | **Real covers, clean titles** | Music videos show the album cover of the song instead of a video frame whenever YouTube knows which song it is. Titles drop "(Official Audio)", "[Lyrics]" and the like, and a featured artist moves to the artist line. |
@@ -64,33 +50,45 @@ Numbers are from the release build on Windows 11. Memory is the working set a fe
 | **Keyboard first** | Shortcuts for everything that matters, plus accessible names on every control for screen readers. |
 | **Profiles** | Run separate libraries and accounts side by side with `--profile`. |
 
+## Supported platforms
+
+| Platform | Release builds | Notes |
+|---|---|---|
+| Windows | x86-64 | A zip with `tubefast.exe`, plus a Scoop manifest. |
+| macOS | universal (Apple silicon and Intel) | macOS 11 or later. The bundle is ad-hoc signed but not notarized. |
+| Linux | x86-64 | AppImage and tar.gz builds for distributions with glibc 2.35 or newer. Audio output uses ALSA-compatible devices. X11 and Wayland are supported; Wayland-specific portal and layer-shell features depend on the desktop. |
+
+Source builds are checked in CI on Windows, macOS and Linux.
+
 ## Install
 
-**With [Scoop](https://scoop.sh)**, which shows no Windows warning:
+Downloads are published on the [releases page](https://github.com/yigitbozyaka/tubefast/releases/latest). Each release also lists SHA-256 checksums in `SHA256SUMS.txt`.
+
+**With [Scoop](https://scoop.sh)** on Windows, which shows no Windows warning:
 
 ```sh
 scoop install https://github.com/yigitbozyaka/tubefast/releases/latest/download/tubefast.json
 ```
 
-**By hand:**
+**By hand on Windows:**
 
 1. Download `tubefast-windows-x64.zip` from the [latest release](https://github.com/yigitbozyaka/tubefast/releases/latest).
 2. Right-click the zip, choose **Properties**, tick **Unblock** and press **OK**.
 3. Unzip it anywhere and run `tubefast.exe`.
 
-Step 2 is there because Tubefast is not code signed. Windows trusts a new program only after enough people have run it, so without that step the first launch shows "Windows protected your PC". If you see it, choose **More info**, then **Run anyway**.
+Step 2 is there because Materialfast is not code signed. Windows trusts a new program only after enough people have run it, so without that step the first launch shows "Windows protected your PC". If you see it, choose **More info**, then **Run anyway**.
 
-**On macOS** (Apple silicon and Intel, macOS 11 or later):
+**On macOS:**
 
 1. Download `tubefast-macos-universal.zip` from the [latest release](https://github.com/yigitbozyaka/tubefast/releases/latest) and unzip it.
 2. Move `Tubefast.app` to **Applications**.
-3. Tubefast is not notarized by Apple, so clear the download flag once before the first launch:
+3. Materialfast is not notarized by Apple, so clear the download flag once before the first launch:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/Tubefast.app
 ```
 
-**On Linux** (x86-64, any distribution with glibc 2.35 or newer, such as Ubuntu 22.04, Debian 12 or Fedora 36):
+**On Linux:**
 
 - **AppImage:** download `Tubefast-x86_64.AppImage` from the [latest release](https://github.com/yigitbozyaka/tubefast/releases/latest), make it executable and run it:
 
@@ -99,7 +97,7 @@ xattr -dr com.apple.quarantine /Applications/Tubefast.app
   ./Tubefast-x86_64.AppImage
   ```
 
-- **Installed for your user, with a menu entry:** download `tubefast-linux-x64.tar.gz`, unpack it and run the installer. It puts Tubefast in `~/.local/bin` and adds it to your app menu. `./install.sh --uninstall` removes it again.
+- **Installed for your user, with a menu entry:** download `tubefast-linux-x64.tar.gz`, unpack it and run the installer. It puts the executable in `~/.local/bin` and adds it to your app menu. `./install.sh --uninstall` removes it again.
 
   ```sh
   tar -xzf tubefast-linux-x64.tar.gz
@@ -112,22 +110,20 @@ You can check that a download was built from this repository by GitHub, not by a
 gh attestation verify tubefast-windows-x64.zip --repo yigitbozyaka/tubefast
 ```
 
-Each release also lists the SHA-256 of every download in `SHA256SUMS.txt`.
-
-Windows and macOS are the platforms it is used on most. On macOS and Linux the session file is protected by file permissions instead of encryption. Linux builds are new: the font fallback for non-Latin scripts is still missing there, and bug reports from Linux are very welcome. See [Contributing](CONTRIBUTING.md).
-
-## Signing in
+## Sign in
 
 Everything except your personal feed and your playlists works without an account. To sign in, click **Sign in** at the bottom of the sidebar and pick one of two ways:
 
-- **Continue in browser** opens a separate Edge or Chrome window. Sign in to Google there and the window closes by itself.
+- **Continue in browser** opens a supported Chromium- or Firefox-based browser window. Sign in to Google there and the window closes by itself.
 - **Paste your cookie** if the browser window is refused by Google. The dialog lists the three steps.
 
-If your Google account has more than one channel, such as a brand channel, the account row at the bottom of the sidebar reads **Switch channel** and picks which one Tubefast uses. The choice is kept for next time.
+If your Google account has more than one channel, such as a brand channel, the account row at the bottom of the sidebar reads **Switch channel** and picks which one Materialfast uses. The choice is kept for next time.
 
-Your session never leaves your computer. It is stored in your user profile, encrypted with your Windows account (DPAPI) or, on macOS and Linux, in a file only your user can read, and is sent only to YouTube. Sign out removes it.
+Your session stays on your computer. It is protected with your Windows account on Windows, or stored in a file only your user can read on macOS and Linux, and is sent only to YouTube. Sign out removes it.
 
 ## Shortcuts
+
+`Ctrl` means `Cmd` on macOS, and `Alt` means `Option`. These shortcuts apply when Materialfast has keyboard focus and no text field is using it.
 
 | Key | Action |
 |---|---|
@@ -135,7 +131,7 @@ Your session never leaves your computer. It is stored in your user profile, encr
 | `Ctrl` + `K` or `/` | Jump to search |
 | `Ctrl` + `→` / `Ctrl` + `←` | Next / previous track |
 | `Ctrl` + `Z` | Bring back the queue you just replaced |
-| `Esc` | Close the now playing view |
+| `Esc` | Close the now playing view while recording a shortcut or viewing the expanded player |
 | Media keys | Play or pause, next, previous, from any window |
 | `Alt` + `←` / `Alt` + `→` | Back / forward |
 | `F5` or `Ctrl` + `R` | Reload the page |
@@ -144,6 +140,8 @@ Your session never leaves your computer. It is stored in your user profile, encr
 Right-click a track, or use the **⋯** button on a row, for play next, add to queue, like, go to artist and go to album.
 
 ## Command line
+
+The executable is still named `tubefast` so that commands match the downloadable files:
 
 ```sh
 tubefast "daft punk"                 # open with a search
@@ -162,35 +160,44 @@ cd tubefast
 cargo run --release
 ```
 
-On macOS, `cargo build --release && macos/bundle.sh` makes `target/Tubefast.app`, which is what gives Now Playing its name and icon.
+Use `cargo run -- --profile dev` for a separate library and sign-in while developing.
 
-On Linux, install the ALSA headers first (`sudo apt install libasound2-dev` on Debian and Ubuntu, `sudo dnf install alsa-lib-devel` on Fedora). `linux/package.sh` turns a release build into the same tarball the releases ship, and into an AppImage too when `appimagetool` is installed.
+On Linux, install the ALSA development headers first (`sudo apt install libasound2-dev` on Debian and Ubuntu, or `sudo dnf install alsa-lib-devel` on Fedora). `linux/package.sh` turns a release build into the tar.gz used by releases, and into an AppImage too when `appimagetool` is installed.
+
+On macOS, `cargo build --release && macos/bundle.sh` makes `target/Tubefast.app`, using the bundle name and icon shown by the system.
 
 ## How it works
 
-- **Data** comes from the same internal API the YouTube Music website uses. Responses are parsed while streaming and the parts Tubefast never shows are skipped before they are allocated.
-- **Audio** is fetched progressively, decoded with [Symphonia](https://github.com/pdeljanov/Symphonia) on its own thread and handed to [rodio](https://github.com/RustAudio/rodio). The interface never waits for the network. Tracks longer than about eight minutes keep a sliding 8 MB window in memory instead of the whole file, so an hour-long mix costs the same as a song.
-- **The interface** is immediate-mode egui on OpenGL. It repaints only when something changes, so an idle window uses no CPU.
+- **Data** comes from the same internal API the YouTube Music website uses. Responses are parsed as they arrive, and fields the app never shows are skipped where possible.
+- **Audio** is fetched progressively, decoded on its own thread with [Symphonia](https://github.com/pdeljanov/Symphonia) and `opus-decoder`, then handed to [rodio](https://github.com/RustAudio/rodio). Long tracks use a bounded sliding buffer instead of keeping the whole file in memory.
+- **The interface** is immediate-mode egui on OpenGL. It avoids continuous repaints when idle, and background threads handle network and decoding work.
+- **The visualizer** uses an FFT over the decoded samples to publish 32 frequency bands to the interface. The full-screen player draws those bands and offers a persisted Top or Bottom position in Settings.
+
+## Contributing
+
+Bug reports, fixes and features are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and repository layout. Before opening a pull request, run the same checks as CI:
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+```
 
 ## Good to know
 
-- **Tubefast is unofficial.** It is not affiliated with, endorsed by or sponsored by YouTube or Google. YouTube and YouTube Music are trademarks of Google LLC.
-- **It can break.** YouTube changes its internal API without notice. The settings that usually need changing live in one small file, [`clients.json`](clients.json). When playback fails, Tubefast fetches the current copy from this repository and tries again, so most breakages are fixed for everyone with one commit and no new download. `tubefast --selftest` tells you which step failed.
-- **What it talks to.** YouTube, GitHub, and lrclib.net for lyrics. At start it reads `clients.json` and checks whether a newer release exists. A new version is downloaded only when you click **Update**, from this repository's releases, and is installed only if it matches the SHA-256 published with the release. Copies installed with Scoop are updated with `scoop update tubefast` instead. When you open the lyrics of a song that YouTube Music has no timed lyrics for, its title, its first artist and its length are sent to [lrclib.net](https://lrclib.net) to look for them there. With **Show on Discord** turned on, the title, artist, cover and position of the playing song are also handed to the Discord app on your computer. Nothing else about you is sent, and there is no telemetry.
-- **If your Discord status does not show,** open the gear menu: the line under the switch says whether Tubefast found Discord. It needs the Discord desktop app, not Discord in a browser, running on the same computer, and a song that is playing rather than paused. If both are fine, look in Discord's own settings under **Activity Privacy**: sharing your activity with others has to be on there. How soon other people see a change is up to Discord.
-- **If it crashes,** the reason is written to `crash.log` next to your data (`%APPDATA%\tubefast\data` on Windows, `~/Library/Application Support/tubefast` on macOS, `~/.local/share/tubefast` on Linux). Attach it to your bug report.
+- **Materialfast is unofficial.** It is not affiliated with, endorsed by or sponsored by YouTube or Google. YouTube and YouTube Music are trademarks of Google LLC.
+- **It can break.** YouTube changes its internal API without notice. The settings that usually need changing live in one small file, [`clients.json`](clients.json). When playback fails, Materialfast fetches the current copy from this repository and tries again, so most breakages can be fixed for everyone without a new download. `tubefast --selftest` tells you which step failed.
+- **What it talks to.** YouTube, GitHub, and lrclib.net for lyrics. At start it reads `clients.json` and checks whether a newer release exists. A new version is downloaded only when you click **Update**, from this repository's releases, and is installed only if it matches the SHA-256 published with the release. Copies installed with Scoop are updated with `scoop update tubefast` instead. When you open the lyrics of a song that YouTube Music has no timed lyrics for, its title, its first artist and its length are sent to [lrclib.net](https://lrclib.net) to look for them there. With **Show on Discord** turned on, the title, artist, cover and position of the playing song are also handed to the Discord app on your computer. There is no telemetry.
+- **If your Discord status does not show,** open the gear menu: the line under the switch says whether Materialfast found Discord. It needs the Discord desktop app, not Discord in a browser, running on the same computer, and a song that is playing rather than paused. If both are fine, look in Discord's own settings under **Activity Privacy**: sharing your activity with others has to be on there. How soon other people see a change is up to Discord.
+- **If it crashes,** the reason is written to `crash.log` next to your data (`%APPDATA%\tubefast\data` on Windows, `~/Library/Application Support/tubefast` on macOS, `~/.local/share/tubefast` on Linux). Attach it to your bug report. These paths use the historical `tubefast` ID so existing saves keep loading.
 - **Use it at your own risk.** YouTube's Terms of Service do not provide for third-party clients. Nobody can promise how YouTube treats accounts that use one. If that worries you, stay signed out.
 - **Audio quality** is Opus at about 160 kbps (variable bitrate) when YouTube offers it, otherwise 128 kbps AAC.
 
-## Not there yet
-
-Syncing likes back to your account, a light theme, an installer, a notarized macOS build, and Flathub and AUR packages. Pull requests for any of these are welcome.
-
 ## Acknowledgements
 
-Tubefast exists because of **[Spotifast](https://github.com/crmne/spotifast)** by [@crmne](https://github.com/crmne). Spotifast showed that a streaming client can be a small native app instead of a browser in disguise. Tubefast takes the same idea and the same choices (Rust, egui, no browser engine) and applies them to YouTube Music. If you use Spotify, go and star it.
+Materialfast exists because of **[Spotifast](https://github.com/crmne/spotifast)** by [@crmne](https://github.com/crmne). Spotifast showed that a streaming client can be a small native app instead of a browser in disguise. Materialfast takes the same idea and the same choices (Rust, egui, no browser engine) and applies them to YouTube Music. If you use Spotify, go and star it.
 
-Built on [egui](https://github.com/emilk/egui), [Symphonia](https://github.com/pdeljanov/Symphonia), [rodio](https://github.com/RustAudio/rodio) and [ureq](https://github.com/algesten/ureq). Icons are [Phosphor](https://phosphoricons.com) (MIT). Typefaces are [Onest](https://fonts.google.com/specimen/Onest) and [Big Shoulders Display](https://fonts.google.com/specimen/Big+Shoulders+Display) (SIL Open Font License, texts in `assets/fonts`). Client parameters are kept in step with the research done by the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
+Built on [egui](https://github.com/emilk/egui), [Symphonia](https://github.com/pdeljanov/Symphonia), [rodio](https://github.com/RustAudio/rodio), `opus-decoder` and [ureq](https://github.com/algesten/ureq). Icons are [Phosphor](https://phosphoricons.com) (MIT). Typefaces are [Onest](https://fonts.google.com/specimen/Onest) and [Big Shoulders Display](https://fonts.google.com/specimen/Big+Shoulders+Display) (SIL Open Font License, texts in `assets/fonts`). Client parameters are kept in step with the research done by the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project.
 
 ## License
 
